@@ -1,8 +1,0 @@
-return MaterialApp(
-      title: 'UniPlanner',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
-      home: const TelaInicial(),
-    );
