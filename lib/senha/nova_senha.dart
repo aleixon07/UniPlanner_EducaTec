@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:uniplanner/login.dart';
 
-import 'sidebar.dart';
+import '../sidebar.dart';
+import 'senha_redefinida.dart';
 
-class RecuperarSenha extends StatelessWidget {
-  const RecuperarSenha({super.key});
+class NovaSenha extends StatelessWidget {
+  const NovaSenha({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBarUniPlanner(),
+      appBar: const AppBarUniPlanner(),
       backgroundColor: Colors.white,
       body: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
@@ -18,7 +18,7 @@ class RecuperarSenha extends StatelessWidget {
           children: [
             const SizedBox(height: 100),
             const Text(
-              'Recuperar Senha',
+              'Nova Senha',
               style: TextStyle(
                 fontFamily: 'NunitoSans',
                 fontSize: 28,
@@ -27,7 +27,7 @@ class RecuperarSenha extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Insira o seu CPF abaixo para receber um código de verificação por e-mail.',
+              'Crie uma nova senha de acesso forte e segura para a sua conta.',
               style: TextStyle(
                 fontFamily: 'NunitoSans',
                 fontSize: 14,
@@ -36,17 +36,24 @@ class RecuperarSenha extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-            
+
+            const Text(
+              'Nova Senha',
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 8),
             TextField(
+              obscureText: true,
               decoration: InputDecoration(
-                labelText: 'CPF',
-                hintText: '000.000.000-00',
+                hintText: '••••••••',
                 hintStyle: const TextStyle(
                   fontFamily: 'NunitoSans',
                   color: Color(0xFF9E9E9E),
                 ),
-                
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,
@@ -61,11 +68,45 @@ class RecuperarSenha extends StatelessWidget {
                 ),
               ),
             ),
+
+            const SizedBox(height: 16),
+
+            const Text(
+              'Confirmar Senha',
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: '••••••••',
+                hintStyle: const TextStyle(
+                  fontFamily: 'NunitoSans',
+                  color: Color(0xFF9E9E9E),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3750B5),
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -73,8 +114,16 @@ class RecuperarSenha extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SenhaRedefinida(),
+                    ),
+                  );
+                },
                 child: const Text(
-                  'Enviar Código',
+                  'Redefinir Senha',
                   style: TextStyle(
                     fontFamily: 'NunitoSans',
                     fontSize: 16,
@@ -86,7 +135,19 @@ class RecuperarSenha extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Center(
-              child: LinkText(titulo: 'Voltar ao login', telaDestino: Login())
+              child: TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Voltar',
+                  style: TextStyle(
+                    fontFamily: 'NunitoSans',
+                    fontSize: 13,
+                    color: Color(0xFF7A7A7A),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

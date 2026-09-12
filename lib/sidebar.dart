@@ -3,48 +3,257 @@ import 'package:flutter/material.dart';
 import 'principal.dart';
 import 'salas.dart';
 
-class Sidebar extends StatelessWidget {
+class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
+
+  @override
+  State<Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<Sidebar> {
+  bool usuariosAberto = true;
+  bool salasAberto = true;
+
+  final Color azul = const Color(0xFF3750B5);
+  final Color azulSelecionado = const Color(0xFF5A70C7);
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      child: ListView(
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Color(0xFF3750B5)),
-            child: Text(
-              'Menu',
-              style: TextStyle(color: Colors.white, fontSize: 24),
+      width: 240,
+      backgroundColor: azul,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.only(top: 20),
+          children: [
+            // =========================
+            // TELA PRINCIPAL
+            // =========================
+
+            _itemMenu(
+              titulo: 'Tela Principal',
+              onTap: () {
+                Navigator.pop(context);
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaInicial(),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 4),
+
+            // =========================
+            // GERENCIAR USUÁRIOS
+            // =========================
+
+            _itemExpandivel(
+              titulo: 'Gerenciar Usuários',
+              aberto: usuariosAberto,
+              onTap: () {
+                setState(() {
+                  usuariosAberto = !usuariosAberto;
+                });
+              },
+            ),
+
+            if (usuariosAberto) ...[
+              _subItem(
+                titulo: 'Aluno',
+                onTap: () {
+                  // TODO: abrir tela de alunos
+                },
+              ),
+
+              _subItem(
+                titulo: 'Professor',
+                onTap: () {
+                  // TODO: abrir tela de professores
+                },
+              ),
+            ],
+
+            const SizedBox(height: 4),
+
+            // =========================
+            // GERENCIAR SALAS
+            // =========================
+
+            _itemExpandivel(
+              titulo: 'Gerenciar Salas',
+              aberto: salasAberto,
+              onTap: () {
+                setState(() {
+                  salasAberto = !salasAberto;
+                });
+              },
+            ),
+
+            if (salasAberto) ...[
+              _subItem(
+                titulo: 'Salas',
+                onTap: () {
+                  Navigator.pop(context);
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const Salas(),
+                    ),
+                  );
+                },
+              ),
+
+              _subItem(
+                titulo: 'Reservas',
+                onTap: () {
+                  // TODO: abrir tela de reservas
+                },
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // =========================
+            // ADICIONAR MATERIAS
+            // =========================
+
+            _itemMenu(
+              titulo: 'Adicionar Materias',
+              onTap: () {
+                // TODO: abrir tela de matérias
+              },
+            ),
+
+            const SizedBox(height: 4),
+
+            // =========================
+            // TROCAR DE CURSO
+            // =========================
+
+            _itemMenu(
+              titulo: 'Trocar de Curso',
+              onTap: () {
+                // TODO: abrir tela de troca de curso
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ITEM NORMAL
+  // ============================================================
+
+  Widget _itemMenu({
+    required String titulo,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 0),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        title: Text(
+          titulo,
+          style: const TextStyle(
+            fontFamily: 'NunitoSans',
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  // ============================================================
+  // ITEM EXPANSÍVEL
+  // ============================================================
+
+  Widget _itemExpandivel({
+    required String titulo,
+    required bool aberto,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 0),
+      child: Container(
+        height: 40,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: azulSelecionado,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.only(
+            left: 16,
+            right: 12,
+          ),
+          title: Text(
+            titulo,
+            style: const TextStyle(
+              fontFamily: 'NunitoSans',
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.home),
-            title: const Text('Tela Principal'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TelaInicial()),
-              );
-            },
+          trailing: Icon(
+            aberto ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+            color: Colors.white,
+            size: 25,
           ),
-          ListTile(
-            leading: const Icon(Icons.school),
-            title: const Text('Reserva de Salas'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const Salas()),
-              );
-            },
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // SUBITEM
+  // ============================================================
+
+  Widget _subItem({
+    required String titulo,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 36,
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.only(
+          left: 49,
+          right: 16,
+        ),
+        title: Text(
+          titulo,
+          style: const TextStyle(
+            fontFamily: 'NunitoSans',
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
           ),
-        ],
+        ),
+        onTap: onTap,
       ),
     );
   }
 }
 
-class AppBarUniPlanner extends StatelessWidget implements PreferredSizeWidget {
+// ================================================================
+// APP BAR
+// ================================================================
+
+class AppBarUniPlanner extends StatelessWidget
+    implements PreferredSizeWidget {
   const AppBarUniPlanner({super.key});
 
   @override
@@ -52,7 +261,12 @@ class AppBarUniPlanner extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       title: const Align(
         alignment: Alignment.centerRight,
-        child: Text('UniPlanner', style: TextStyle(fontFamily: 'Offside')),
+        child: Text(
+          'UniPlanner',
+          style: TextStyle(
+            fontFamily: 'Offside',
+          ),
+        ),
       ),
       backgroundColor: const Color(0xFF3750B5),
       foregroundColor: Colors.white,

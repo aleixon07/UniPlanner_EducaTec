@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'principal.dart';
 import 'sidebar.dart';
-import 'recuperar_senha.dart';
+import 'senha/recuperar_senha.dart';
 
 class Login extends StatelessWidget {
   const Login({super.key});
@@ -22,7 +21,7 @@ class Login extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(height:50),
+                    const SizedBox(height: 50),
                     const Text(
                       'Seja Bem-Vindo',
                       style: TextStyle(
