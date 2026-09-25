@@ -31,6 +31,13 @@ String formatarData(DateTime data) {
       '${_mesesAbreviados[data.month - 1]}';
 }
 
+/// Formata a data em números. Ex.: `16/09/2026`
+String formatarDataCurta(DateTime data) {
+  final d = data.day.toString().padLeft(2, '0');
+  final m = data.month.toString().padLeft(2, '0');
+  return '$d/$m/${data.year}';
+}
+
 /// Formata a hora em 24h. Ex.: `08:00`
 String formatarHora(TimeOfDay hora) {
   final h = hora.hour.toString().padLeft(2, '0');

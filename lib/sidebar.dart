@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'usuario/principal.dart';
+import 'usuario/reservar_sala.dart';
 import 'usuario/salas.dart';
 
 class Sidebar extends StatefulWidget {
@@ -38,6 +39,23 @@ class _SidebarState extends State<Sidebar> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const TelaInicial()),
+                );
+              },
+            ),
+
+            const SizedBox(height: 4),
+
+            // =========================
+            // RESERVAR SALA
+            // =========================
+            _itemMenu(
+              titulo: 'Reservar Sala',
+              onTap: () {
+                Navigator.pop(context);
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ReservarSala()),
                 );
               },
             ),
@@ -176,28 +194,30 @@ class _SidebarState extends State<Sidebar> {
       child: Container(
         height: 40,
         margin: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
+        // O fundo precisa vir de um Material, e não de um BoxDecoration:
+        // senão o ListTile pinta o splash atrás da cor e o toque some.
+        child: Material(
           color: azulSelecionado,
           borderRadius: BorderRadius.circular(5),
-        ),
-        child: ListTile(
-          dense: true,
-          contentPadding: const EdgeInsets.only(left: 16, right: 12),
-          title: Text(
-            titulo,
-            style: const TextStyle(
-              fontFamily: 'NunitoSans',
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+          child: ListTile(
+            dense: true,
+            contentPadding: const EdgeInsets.only(left: 16, right: 12),
+            title: Text(
+              titulo,
+              style: const TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
             ),
+            trailing: Icon(
+              aberto ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              color: Colors.white,
+              size: 25,
+            ),
+            onTap: onTap,
           ),
-          trailing: Icon(
-            aberto ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-            color: Colors.white,
-            size: 25,
-          ),
-          onTap: onTap,
         ),
       ),
     );
