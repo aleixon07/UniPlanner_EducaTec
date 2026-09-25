@@ -1,74 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 
-import 'sidebar.dart';
-
-// ============================================================
-// MODELO DE AVISO
-// ============================================================
-class Aviso {
-  final String titulo;
-  final String descricao;
-  final DateTime data;
-  final TimeOfDay hora;
-  final Color cor;
-
-  const Aviso({
-    required this.titulo,
-    required this.descricao,
-    required this.data,
-    required this.hora,
-    required this.cor,
-  });
-}
-
-/// Cores disponíveis para marcar um aviso.
-const List<Color> coresAviso = [
-  Color(0xFFE85D75),
-  Color(0xFFF2994A),
-  Color(0xFFF2C94C),
-  Color(0xFF27AE60),
-  Color(0xFF2D9CDB),
-  Color(0xFF3750B5),
-  Color(0xFF9B51E0),
-  Color(0xFF7A7A7A),
-];
-
-const List<String> _diasSemana = [
-  'seg.',
-  'ter.',
-  'qua.',
-  'qui.',
-  'sex.',
-  'sáb.',
-  'dom.',
-];
-
-const List<String> _mesesAbreviados = [
-  'jan.',
-  'fev.',
-  'mar.',
-  'abr.',
-  'mai.',
-  'jun.',
-  'jul.',
-  'ago.',
-  'set.',
-  'out.',
-  'nov.',
-  'dez.',
-];
-
-String formatarData(DateTime data) {
-  return '${_diasSemana[data.weekday - 1]}, ${data.day} de '
-      '${_mesesAbreviados[data.month - 1]}';
-}
-
-String formatarHora(TimeOfDay hora) {
-  final h = hora.hour.toString().padLeft(2, '0');
-  final m = hora.minute.toString().padLeft(2, '0');
-  return '$h:$m';
-}
+import '../model/aviso.dart';
+import '../service/formatador_data.dart';
+import '../sidebar.dart';
 
 // ============================================================
 // TELA PRINCIPAL
@@ -623,7 +558,10 @@ class _DialogAvisoState extends State<DialogAviso> {
   }
 
   Future<void> _escolherHora() async {
-    final escolhida = await showTimePicker(context: context, initialTime: _hora);
+    final escolhida = await showTimePicker(
+      context: context,
+      initialTime: _hora,
+    );
 
     if (escolhida != null) {
       setState(() {
@@ -823,7 +761,7 @@ class _DialogAvisoState extends State<DialogAviso> {
               children: [
                 Expanded(
                   child: TextButton(
-                  onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context),
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFFE3E3E3),
                       foregroundColor: const Color(0xFF4A4A4A),

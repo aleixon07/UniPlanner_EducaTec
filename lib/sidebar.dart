@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'principal.dart';
-import 'salas.dart';
+import 'usuario/principal.dart';
+import 'usuario/salas.dart';
 
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
@@ -37,9 +37,7 @@ class _SidebarState extends State<Sidebar> {
 
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const TelaInicial(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const TelaInicial()),
                 );
               },
             ),
@@ -49,7 +47,6 @@ class _SidebarState extends State<Sidebar> {
             // =========================
             // GERENCIAR USUÁRIOS
             // =========================
-
             _itemExpandivel(
               titulo: 'Gerenciar Usuários',
               aberto: usuariosAberto,
@@ -81,7 +78,6 @@ class _SidebarState extends State<Sidebar> {
             // =========================
             // GERENCIAR SALAS
             // =========================
-
             _itemExpandivel(
               titulo: 'Gerenciar Salas',
               aberto: salasAberto,
@@ -100,9 +96,7 @@ class _SidebarState extends State<Sidebar> {
 
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const Salas(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const Salas()),
                   );
                 },
               ),
@@ -120,7 +114,6 @@ class _SidebarState extends State<Sidebar> {
             // =========================
             // ADICIONAR MATERIAS
             // =========================
-
             _itemMenu(
               titulo: 'Adicionar Materias',
               onTap: () {
@@ -133,7 +126,6 @@ class _SidebarState extends State<Sidebar> {
             // =========================
             // TROCAR DE CURSO
             // =========================
-
             _itemMenu(
               titulo: 'Trocar de Curso',
               onTap: () {
@@ -150,10 +142,7 @@ class _SidebarState extends State<Sidebar> {
   // ITEM NORMAL
   // ============================================================
 
-  Widget _itemMenu({
-    required String titulo,
-    required VoidCallback onTap,
-  }) {
+  Widget _itemMenu({required String titulo, required VoidCallback onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 0),
       child: ListTile(
@@ -186,17 +175,14 @@ class _SidebarState extends State<Sidebar> {
       padding: const EdgeInsets.symmetric(horizontal: 0),
       child: Container(
         height: 40,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: azulSelecionado,
           borderRadius: BorderRadius.circular(5),
         ),
         child: ListTile(
           dense: true,
-          contentPadding: const EdgeInsets.only(
-            left: 16,
-            right: 12,
-          ),
+          contentPadding: const EdgeInsets.only(left: 16, right: 12),
           title: Text(
             titulo,
             style: const TextStyle(
@@ -221,18 +207,12 @@ class _SidebarState extends State<Sidebar> {
   // SUBITEM
   // ============================================================
 
-  Widget _subItem({
-    required String titulo,
-    required VoidCallback onTap,
-  }) {
+  Widget _subItem({required String titulo, required VoidCallback onTap}) {
     return SizedBox(
       height: 36,
       child: ListTile(
         dense: true,
-        contentPadding: const EdgeInsets.only(
-          left: 49,
-          right: 16,
-        ),
+        contentPadding: const EdgeInsets.only(left: 49, right: 16),
         title: Text(
           titulo,
           style: const TextStyle(
@@ -252,8 +232,7 @@ class _SidebarState extends State<Sidebar> {
 // APP BAR
 // ================================================================
 
-class AppBarUniPlanner extends StatelessWidget
-    implements PreferredSizeWidget {
+class AppBarUniPlanner extends StatelessWidget implements PreferredSizeWidget {
   const AppBarUniPlanner({super.key});
 
   @override
@@ -261,12 +240,7 @@ class AppBarUniPlanner extends StatelessWidget
     return AppBar(
       title: const Align(
         alignment: Alignment.centerRight,
-        child: Text(
-          'UniPlanner',
-          style: TextStyle(
-            fontFamily: 'Offside',
-          ),
-        ),
+        child: Text('UniPlanner', style: TextStyle(fontFamily: 'Offside')),
       ),
       backgroundColor: const Color(0xFF3750B5),
       foregroundColor: Colors.white,

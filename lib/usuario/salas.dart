@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'sidebar.dart';
+import '../sidebar.dart';
 
 class Salas extends StatelessWidget {
   const Salas({super.key});

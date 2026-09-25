@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'principal.dart';
+
+import 'usuario/principal.dart';
 import 'sidebar.dart';
 import 'senha/recuperar_senha.dart';
 
@@ -72,10 +73,10 @@ class Login extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
-                      LinkText(
-  titulo: 'Esqueceu sua senha? Clique aqui!',
-  telaDestino: RecuperarSenha(),
-),
+                    LinkText(
+                      titulo: 'Esqueceu sua senha? Clique aqui!',
+                      telaDestino: RecuperarSenha(),
+                    ),
 
                     const SizedBox(height: 15),
 
@@ -118,13 +119,9 @@ class Login extends StatelessWidget {
 
 class LinkText extends StatelessWidget {
   final String titulo;
-  final Widget telaDestino; 
+  final Widget telaDestino;
 
-  const LinkText({
-    super.key, 
-    required this.titulo, 
-    required this.telaDestino,
-  });
+  const LinkText({super.key, required this.titulo, required this.telaDestino});
 
   @override
   Widget build(BuildContext context) {
