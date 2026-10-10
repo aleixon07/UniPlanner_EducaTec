@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "668868131979",
+    "project_id": "uniplanner-educatec",
+    "storage_bucket": "uniplanner-educatec.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:668868131979:android:14794f2bfbc6784590e88e",
+        "android_client_info": {
+          "package_name": "br.com.educatec.uniplanner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnMaSgtK06XeB8GXucGlPU49TSG7felxM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

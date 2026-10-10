@@ -1,8 +1,16 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'firebase_options.dart';
 import 'splash.dart';
 
-void main() {
+Future<void> main() async {
+  // Precisa vir antes do initializeApp: ele usa canais de plataforma,
+  // que só existem depois que o binding do Flutter é criado.
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(const MyApp());
 }
 

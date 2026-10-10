@@ -1,12 +1,70 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 
-import 'usuario/principal.dart';
-import 'sidebar.dart';
 import 'senha/recuperar_senha.dart';
+import 'service/auth_service.dart';
+import 'sidebar.dart';
+import 'usuario/principal.dart';
 
-class Login extends StatelessWidget {
+class Login extends StatefulWidget {
   const Login({super.key});
+
+  @override
+  State<Login> createState() => _LoginState();
+}
+
+class _LoginState extends State<Login> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _senhaController = TextEditingController();
+
+  bool _carregando = false;
+  String? _erro;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _senhaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _entrar() async {
+    final email = _emailController.text.trim();
+    final senha = _senhaController.text;
+
+    if (email.isEmpty || senha.isEmpty) {
+      setState(() => _erro = 'Preencha o e-mail e a senha.');
+      return;
+    }
+
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+
+    try {
+      await AuthService.entrar(email: email, senha: senha);
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const TelaInicial()),
+      );
+    } on ErroAuth catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _erro = e.mensagem;
+        _carregando = false;
+      });
+    } catch (e) {
+      // Rede caindo no meio, Firebase não inicializado, qualquer imprevisto:
+      // sem isto o botão ficaria travado em "carregando" para sempre.
+      if (!mounted) return;
+      setState(() {
+        _erro = 'Erro inesperado ao entrar. Tente novamente.';
+        _carregando = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,12 +96,19 @@ class Login extends StatelessWidget {
 
                     const SizedBox(height: 25),
 
+                    // TODO(RF001): voltar para CPF quando o mapeamento
+                    // CPF -> credencial do Firebase for definido.
                     SizedBox(
                       width: 300,
                       child: TextField(
+                        controller: _emailController,
+                        enabled: !_carregando,
+                        keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: 'CPF',
-                          hintText: 'Digite seu CPF',
+                          labelText: 'E-mail',
+                          hintText: 'Digite seu e-mail',
                           labelStyle: const TextStyle(fontFamily: 'NunitoSans'),
                           hintStyle: const TextStyle(fontFamily: 'NunitoSans'),
                           border: OutlineInputBorder(
@@ -58,7 +123,11 @@ class Login extends StatelessWidget {
                     SizedBox(
                       width: 300,
                       child: TextField(
+                        controller: _senhaController,
+                        enabled: !_carregando,
                         obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _entrar(),
                         decoration: InputDecoration(
                           labelText: 'Senha',
                           hintText: 'Digite sua senha',
@@ -70,6 +139,23 @@ class Login extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                    if (_erro != null) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: 300,
+                        child: Text(
+                          _erro!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'NunitoSans',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFE23B3B),
+                          ),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 20),
 
@@ -92,18 +178,20 @@ class Login extends StatelessWidget {
                           borderRadius: BorderRadius.circular(15),
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const TelaInicial(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Entrar',
-                        style: TextStyle(fontFamily: 'NunitoSans'),
-                      ),
+                      onPressed: _carregando ? null : _entrar,
+                      child: _carregando
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Entrar',
+                              style: TextStyle(fontFamily: 'NunitoSans'),
+                            ),
                     ),
                   ],
                 ),
