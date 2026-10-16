@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -58,5 +55,14 @@ class DefaultFirebaseOptions {
     messagingSenderId: '668868131979',
     projectId: 'uniplanner-educatec',
     storageBucket: 'uniplanner-educatec.firebasestorage.app',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBz7ocsDZYM4uoabTi9UUI9ABTR91fiCCA',
+    appId: '1:668868131979:web:224246228b2df85290e88e',
+    messagingSenderId: '668868131979',
+    projectId: 'uniplanner-educatec',
+    authDomain: 'uniplanner-educatec.firebaseapp.com',
+    storageBucket: 'uniplanner-educatec.firebasestorage.app',
+    measurementId: 'G-8QJXS584JY',
   );
 }
