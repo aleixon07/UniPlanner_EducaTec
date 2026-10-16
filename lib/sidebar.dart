@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'admin/gerenciar_cursos.dart';
 import 'usuario/principal.dart';
 import 'usuario/reservar_sala.dart';
 import 'usuario/salas.dart';
@@ -56,6 +57,27 @@ class _SidebarState extends State<Sidebar> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ReservarSala()),
+                );
+              },
+            ),
+
+            const SizedBox(height: 4),
+
+            // =========================
+            // ADMIN
+            // =========================
+            // TODO: mostrar só para o perfil Administrador (RF002), quando o
+            // perfil do usuário logado estiver disponível.
+            _itemMenu(
+              titulo: 'Admin',
+              onTap: () {
+                Navigator.pop(context);
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GerenciarCursos(),
+                  ),
                 );
               },
             ),
@@ -253,14 +275,36 @@ class _SidebarState extends State<Sidebar> {
 // ================================================================
 
 class AppBarUniPlanner extends StatelessWidget implements PreferredSizeWidget {
-  const AppBarUniPlanner({super.key});
+  /// Mostra o selo "ADMIN" ao lado do menu, nas telas da área administrativa.
+  final bool admin;
+
+  const AppBarUniPlanner({super.key, this.admin = false});
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: const Align(
-        alignment: Alignment.centerRight,
-        child: Text('UniPlanner', style: TextStyle(fontFamily: 'Offside')),
+      title: Row(
+        children: [
+          if (admin)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5A70C7),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'ADMIN',
+                style: TextStyle(
+                  fontFamily: 'NunitoSans',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          const Spacer(),
+          const Text('UniPlanner', style: TextStyle(fontFamily: 'Offside')),
+        ],
       ),
       backgroundColor: const Color(0xFF3750B5),
       foregroundColor: Colors.white,
