@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'admin/gerenciar_cursos.dart';
+import 'admin/gerenciar_usuarios.dart';
+import 'model/usuario.dart';
 import 'usuario/principal.dart';
 import 'usuario/reservar_sala.dart';
 import 'usuario/salas.dart';
@@ -18,6 +20,17 @@ class _SidebarState extends State<Sidebar> {
 
   final Color azul = const Color(0xFF3750B5);
   final Color azulSelecionado = const Color(0xFF5A70C7);
+
+  void _abrirUsuarios(PerfilUsuario perfil) {
+    Navigator.pop(context);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GerenciarUsuarios(perfil: perfil),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,16 +113,12 @@ class _SidebarState extends State<Sidebar> {
             if (usuariosAberto) ...[
               _subItem(
                 titulo: 'Aluno',
-                onTap: () {
-                  // TODO: abrir tela de alunos
-                },
+                onTap: () => _abrirUsuarios(PerfilUsuario.aluno),
               ),
 
               _subItem(
                 titulo: 'Professor',
-                onTap: () {
-                  // TODO: abrir tela de professores
-                },
+                onTap: () => _abrirUsuarios(PerfilUsuario.professor),
               ),
             ],
 

@@ -38,6 +38,12 @@ String formatarDataCurta(DateTime data) {
   return '$d/$m/${data.year}';
 }
 
+/// Formata a hora do jeito curto das grades de horário. Ex.: `19h` ou `20h30`
+String formatarHoraCurta(TimeOfDay hora) {
+  if (hora.minute == 0) return '${hora.hour}h';
+  return '${hora.hour}h${hora.minute.toString().padLeft(2, '0')}';
+}
+
 /// Formata a hora em 24h. Ex.: `08:00`
 String formatarHora(TimeOfDay hora) {
   final h = hora.hour.toString().padLeft(2, '0');
