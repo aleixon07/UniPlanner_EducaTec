@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:flutter/material.dart';
 
@@ -27,17 +29,47 @@ class _DialogReservaState extends State<DialogReserva> {
   String? _disciplina;
   Turno _turno = Turno.manha;
   DateTime? _diaSelecionado;
-  DateTime _mesVisivel = DateTime.now();
   String? _erro;
 
-  Set<int> get _diasOcupados =>
-      ReservaService.diasOcupados(widget.sala, _turno, _mesVisivel);
+  // Reservas desta sala, vindas do Firestore e sempre atualizadas: se alguém
+  // reservar enquanto o modal está aberto, o dia fica vermelho na hora.
+  List<Reserva> _reservasDaSala = const [];
+  StreamSubscription<List<Reserva>>? _assinatura;
+
+  @override
+  void initState() {
+    super.initState();
+    _assinatura = ReservaService.instancia
+        .reservasDaSala(widget.sala)
+        .listen(
+          (reservas) {
+            if (!mounted) return;
+            setState(() {
+              _reservasDaSala = reservas;
+              // O dia escolhido pode ter acabado de ser ocupado.
+              final escolhido = _diaSelecionado;
+              if (escolhido != null && _estaOcupado(escolhido)) {
+                _diaSelecionado = null;
+              }
+            });
+          },
+          onError: (Object _) {
+            if (!mounted) return;
+            setState(() {
+              _erro = 'Não foi possível carregar os dias ocupados.';
+            });
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    _assinatura?.cancel();
+    super.dispose();
+  }
 
   bool _estaOcupado(DateTime dia) {
-    if (dia.year != _mesVisivel.year || dia.month != _mesVisivel.month) {
-      return false;
-    }
-    return _diasOcupados.contains(dia.day);
+    return _reservasDaSala.any((r) => r.turno == _turno && r.ehDoDia(dia));
   }
 
   void _adicionar() {
@@ -57,7 +89,11 @@ class _DialogReservaState extends State<DialogReserva> {
         sala: widget.sala,
         disciplina: _disciplina!,
         turno: _turno,
-        data: _diaSelecionado!,
+        data: DateTime(
+          _diaSelecionado!.year,
+          _diaSelecionado!.month,
+          _diaSelecionado!.day,
+        ),
       ),
     );
   }
@@ -259,11 +295,6 @@ class _DialogReservaState extends State<DialogReserva> {
                 setState(() {
                   _diaSelecionado = dias.isNotEmpty ? dias.first : null;
                   _erro = null;
-                });
-              },
-              onDisplayedMonthChanged: (mes) {
-                setState(() {
-                  _mesVisivel = mes;
                 });
               },
             ),

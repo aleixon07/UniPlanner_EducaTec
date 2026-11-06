@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'admin/gerenciar_cursos.dart';
+import 'admin/gerenciar_salas.dart';
 import 'admin/gerenciar_usuarios.dart';
 import 'model/usuario.dart';
 import 'usuario/principal.dart';
 import 'usuario/reservar_sala.dart';
-import 'usuario/salas.dart';
 
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
@@ -145,7 +145,9 @@ class _SidebarState extends State<Sidebar> {
 
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const Salas()),
+                    MaterialPageRoute(
+                      builder: (context) => const GerenciarSalas(),
+                    ),
                   );
                 },
               ),

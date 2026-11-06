@@ -1,32 +1,26 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../model/reserva.dart';
 import '../model/sala.dart';
+import 'auth_service.dart';
 
-/// Fonte de dados das salas e reservas.
+/// Erro de reserva já traduzido para mostrar na tela.
+class ErroReserva implements Exception {
+  final String mensagem;
+  const ErroReserva(this.mensagem);
+
+  @override
+  String toString() => mensagem;
+}
+
+/// Acesso às reservas de salas.
 ///
-/// Por enquanto tudo fica em memória, só para as telas funcionarem. Quando o
-/// Firebase entrar, é este arquivo que muda — as telas continuam iguais.
-class ReservaService {
-  ReservaService._();
+/// Mesmo modelo do `UsuarioService` e do `SalaService`: classe abstrata, para
+/// as telas poderem ser testadas sem Firebase trocando [instancia].
+abstract class ReservaService {
+  static ReservaService instancia = FirebaseReservaService();
 
-  static const List<Sala> salas = [
-    Sala(numero: '301', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '302', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '303', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '304', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '305', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '306', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '307', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '308', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '309', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '310', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '311', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '312', tipo: TipoSala.sala, andar: '3º Andar'),
-    Sala(numero: '301', tipo: TipoSala.laboratorio, andar: '4º Andar'),
-    Sala(numero: '402', tipo: TipoSala.laboratorio, andar: '4º Andar'),
-    Sala(numero: '408', tipo: TipoSala.laboratorio, andar: '4º Andar'),
-    Sala(numero: '409', tipo: TipoSala.laboratorio, andar: '4º Andar'),
-  ];
-
+  // TODO: virar as disciplinas reais do curso quando o cadastro existir.
   static const List<String> disciplinas = [
     'Interface Humano Computador',
     'Programação T30',
@@ -35,57 +29,122 @@ class ReservaService {
     'Engenharia de Software',
   ];
 
-  static final List<Reserva> _reservas = [
-    Reserva(
-      sala: salas[7],
-      disciplina: 'Programação T30',
-      turno: Turno.manha,
-      data: DateTime.now(),
-    ),
-    Reserva(
-      sala: salas[4],
-      disciplina: 'Banco de Dados',
-      turno: Turno.tarde,
-      data: DateTime.now().add(const Duration(days: 2)),
-    ),
-  ];
+  /// Reservas do usuário logado, de hoje em diante, em ordem de data e turno.
+  Stream<List<Reserva>> minhasReservas();
 
-  static List<Reserva> get minhasReservas => List.unmodifiable(_reservas);
+  /// Todas as reservas de uma sala (de qualquer usuário). Usado pelo
+  /// calendário para pintar os dias ocupados.
+  Stream<List<Reserva>> reservasDaSala(Sala sala);
 
-  static void adicionar(Reserva reserva) => _reservas.add(reserva);
+  /// Salva a reserva em nome do usuário logado. Lança [ErroReserva] se a sala
+  /// já estiver ocupada nesse dia e turno, ou se der erro.
+  Future<void> reservar(Reserva reserva);
 
-  /// Dias do mês já ocupados para a sala e o turno informados.
-  ///
-  /// Mistura as reservas realmente cadastradas com uma ocupação fictícia,
-  /// só para o calendário do protótipo ter dias em vermelho.
-  static Set<int> diasOcupados(Sala sala, Turno turno, DateTime mes) {
-    final ocupados = <int>{};
+  /// Cancela (apaga) a reserva. Lança [ErroReserva].
+  Future<void> cancelar(Reserva reserva);
+}
 
-    for (final reserva in _reservas) {
-      final mesmaSala =
-          reserva.sala.numero == sala.numero && reserva.sala.tipo == sala.tipo;
-      final mesmoMes =
-          reserva.data.year == mes.year && reserva.data.month == mes.month;
+class FirebaseReservaService implements ReservaService {
+  CollectionReference<Map<String, dynamic>> get _colecao =>
+      FirebaseFirestore.instance.collection('reservas');
 
-      if (mesmaSala && reserva.turno == turno && mesmoMes) {
-        ocupados.add(reserva.data.day);
-      }
+  List<Reserva> _converter(QuerySnapshot<Map<String, dynamic>> resultado) {
+    return [
+      for (final doc in resultado.docs)
+        if (Reserva.fromMap(doc.id, doc.data()) case final reserva?) reserva,
+    ];
+  }
+
+  @override
+  Stream<List<Reserva>> minhasReservas() {
+    final uid = AuthService.usuarioAtual?.uid;
+    if (uid == null) return Stream.value(const []);
+
+    return _colecao.where('usuarioId', isEqualTo: uid).snapshots().map((
+      resultado,
+    ) {
+      final agora = DateTime.now();
+      final hoje = DateTime(agora.year, agora.month, agora.day);
+
+      // Filtra e ordena aqui, e não na consulta, para não precisar criar
+      // índice composto no Firestore.
+      final lista = _converter(
+        resultado,
+      ).where((r) => !r.data.isBefore(hoje)).toList();
+
+      lista.sort((a, b) {
+        final porData = a.data.compareTo(b.data);
+        return porData != 0 ? porData : a.turno.index.compareTo(b.turno.index);
+      });
+      return lista;
+    });
+  }
+
+  @override
+  Stream<List<Reserva>> reservasDaSala(Sala sala) {
+    return _colecao
+        .where('salaId', isEqualTo: Reserva.salaIdDe(sala))
+        .snapshots()
+        .map(_converter);
+  }
+
+  @override
+  Future<void> reservar(Reserva reserva) async {
+    final uid = AuthService.usuarioAtual?.uid;
+    if (uid == null) {
+      throw const ErroReserva('Entre na sua conta para reservar.');
     }
 
-    // Ocupação fictícia: determinística, para não mudar a cada rebuild.
-    final semente =
-        int.parse(sala.numero) +
-        turno.index +
-        mes.month +
-        (sala.ehLaboratorio ? 1 : 0);
-    final diasNoMes = DateTime(mes.year, mes.month + 1, 0).day;
+    final documento = _colecao.doc(
+      Reserva.idPara(reserva.sala, reserva.turno, reserva.data),
+    );
 
-    for (var dia = 1; dia <= diasNoMes; dia++) {
-      if ((dia * 7 + semente) % 5 == 0) {
-        ocupados.add(dia);
-      }
+    final bool criada;
+    try {
+      // Transação: ler e gravar juntos. Se duas pessoas reservarem a mesma
+      // sala ao mesmo tempo, só uma consegue.
+      criada = await FirebaseFirestore.instance.runTransaction<bool>((
+        transacao,
+      ) async {
+        final existente = await transacao.get(documento);
+        if (existente.exists) return false;
+
+        transacao.set(documento, {
+          ...reserva.toMap(),
+          'usuarioId': uid,
+          'criadoEm': FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+    } on FirebaseException catch (e) {
+      throw ErroReserva(_traduzir(e.code));
     }
 
-    return ocupados;
+    if (!criada) {
+      throw const ErroReserva(
+        'Esta sala acabou de ser reservada nesse dia e turno. '
+        'Escolha outro dia ou turno.',
+      );
+    }
+  }
+
+  @override
+  Future<void> cancelar(Reserva reserva) async {
+    try {
+      await _colecao.doc(reserva.id).delete();
+    } on FirebaseException catch (e) {
+      throw ErroReserva(_traduzir(e.code));
+    }
+  }
+
+  String _traduzir(String codigo) {
+    switch (codigo) {
+      case 'permission-denied':
+        return 'Sem permissão. Verifique as regras do Firestore.';
+      case 'unavailable':
+        return 'Sem conexão. Verifique sua internet.';
+      default:
+        return 'Não foi possível concluir a operação ($codigo).';
+    }
   }
 }
