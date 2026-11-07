@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Erro de autenticação já traduzido para mostrar na tela.
@@ -40,9 +41,40 @@ class AuthService {
       if (usuario == null) {
         throw const ErroAuth('Não foi possível entrar. Tente novamente.');
       }
+
+      await _barrarSeDesativado(usuario);
       return usuario;
     } on FirebaseAuthException catch (e) {
       throw ErroAuth(_traduzir(e.code));
+    }
+  }
+
+  /// Usuário desativado pelo administrador (campo `ativo` = false em
+  /// `usuarios/{uid}`) não pode entrar: a sessão recém-aberta é encerrada.
+  ///
+  /// Conta sem cadastro em `usuarios` (como a do administrador, criada à mão no
+  /// console) segue entrando. Se não der para consultar o cadastro, o acesso é
+  /// negado: na dúvida, uma conta desativada não deve passar.
+  ///
+  /// Limite: isto só vale no momento do login. Quem já estava logado continua
+  /// até sair; para barrar na hora, é preciso desativar a conta no Firebase
+  /// Auth (Admin) ou checar `ativo` nas regras do Firestore.
+  static Future<void> _barrarSeDesativado(User usuario) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(usuario.uid)
+          .get();
+
+      if (doc.data()?['ativo'] == false) {
+        await _auth.signOut();
+        throw const ErroAuth('Esta conta está desativada.');
+      }
+    } on FirebaseException {
+      await _auth.signOut();
+      throw const ErroAuth(
+        'Não foi possível verificar a conta. Tente novamente.',
+      );
     }
   }
 

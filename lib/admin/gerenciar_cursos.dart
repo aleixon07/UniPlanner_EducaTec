@@ -21,6 +21,10 @@ class GerenciarCursos extends StatefulWidget {
 }
 
 class _GerenciarCursosState extends State<GerenciarCursos> {
+  // Criado uma vez só: se fosse criado no build, cada rebuild abriria uma nova
+  // conexão com o Firestore.
+  late final Stream<List<Curso>> _cursos = CursoService.instancia.listar();
+
   void _avisar(String mensagem) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -34,57 +38,60 @@ class _GerenciarCursosState extends State<GerenciarCursos> {
       );
   }
 
+  // O modal já salva no banco; aqui só avisamos. A lista se atualiza sozinha.
   Future<void> _cadastrar() async {
     final nome = await showDialog<String>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => const DialogCurso(),
     );
 
     if (nome == null || !mounted) return;
-
-    setState(() => CursoService.adicionar(nome));
     _avisar('Curso "$nome" cadastrado.');
   }
 
   Future<void> _editar(Curso curso) async {
     final nome = await showDialog<String>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => DialogCurso(curso: curso),
     );
 
     if (nome == null || !mounted) return;
-
-    setState(() => CursoService.editar(curso.id, nome));
     _avisar('Curso atualizado.');
   }
 
   Future<void> _alternarAtivo(Curso curso) async {
-    if (curso.ativo) {
+    final desativando = curso.ativo;
+
+    if (desativando) {
       final confirmou = await confirmarDesativacao(context, curso);
       if (!confirmou || !mounted) return;
+    }
 
-      setState(() => CursoService.definirAtivo(curso.id, false));
-      _avisar('Curso "${curso.nome}" desativado.');
-    } else {
-      setState(() => CursoService.definirAtivo(curso.id, true));
-      _avisar('Curso "${curso.nome}" reativado.');
+    try {
+      await CursoService.instancia.definirAtivo(curso.id, !desativando);
+      if (!mounted) return;
+      _avisar(
+        desativando
+            ? 'Curso "${curso.nome}" desativado.'
+            : 'Curso "${curso.nome}" reativado.',
+      );
+    } on ErroCurso catch (e) {
+      if (!mounted) return;
+      _avisar(e.mensagem);
     }
   }
 
-  Future<void> _abrir(Curso curso) async {
-    await Navigator.push(
+  void _abrir(Curso curso) {
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => TelaCurso(cursoId: curso.id)),
     );
-
-    // A tela do curso pode ter editado ou desativado o curso.
-    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final cursos = CursoService.cursos;
-
     return Scaffold(
       appBar: const AppBarUniPlanner(admin: true),
       drawer: const Sidebar(),
@@ -93,88 +100,118 @@ class _GerenciarCursosState extends State<GerenciarCursos> {
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-            children: [
-              const Text(
-                'Gerenciamento de Cursos',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'NunitoSans',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _azulEscuro,
-                ),
-              ),
+          child: StreamBuilder<List<Curso>>(
+            stream: _cursos,
+            builder: (context, snapshot) {
+              final cursos = snapshot.data;
 
-              const SizedBox(height: 18),
-
-              // ADICIONAR CURSO
-              Center(
-                child: InkWell(
-                  onTap: _cadastrar,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Adicionar Curso',
-                          style: TextStyle(
-                            fontFamily: 'NunitoSans',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: _azul,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE3E8F8),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.add, color: _azul, size: 22),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              if (cursos.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 24),
-                  child: Text(
-                    'Nenhum curso cadastrado.',
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                children: [
+                  const Text(
+                    'Gerenciamento de Cursos',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'NunitoSans',
-                      fontSize: 14,
-                      color: Color(0xFF7A7A7A),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: _azulEscuro,
                     ),
                   ),
-                )
-              else
-                for (final curso in cursos) ...[
-                  _CardCurso(
-                    curso: curso,
-                    onAbrir: () => _abrir(curso),
-                    onEditar: () => _editar(curso),
-                    onAlternarAtivo: () => _alternarAtivo(curso),
+
+                  const SizedBox(height: 18),
+
+                  // ADICIONAR CURSO
+                  Center(
+                    child: InkWell(
+                      onTap: _cadastrar,
+                      borderRadius: BorderRadius.circular(24),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Adicionar Curso',
+                              style: TextStyle(
+                                fontFamily: 'NunitoSans',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: _azul,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE3E8F8),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                color: _azul,
+                                size: 22,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+
+                  const SizedBox(height: 20),
+
+                  if (snapshot.hasError)
+                    const _Mensagem(
+                      'Não foi possível carregar os cursos. '
+                      'Verifique a conexão e as regras do Firestore.',
+                      cor: _vermelho,
+                    )
+                  else if (cursos == null)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (cursos.isEmpty)
+                    const _Mensagem('Nenhum curso cadastrado.')
+                  else
+                    for (final curso in cursos) ...[
+                      _CardCurso(
+                        curso: curso,
+                        onAbrir: () => _abrir(curso),
+                        onEditar: () => _editar(curso),
+                        onAlternarAtivo: () => _alternarAtivo(curso),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                 ],
-            ],
+              );
+            },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Mensagem extends StatelessWidget {
+  final String texto;
+  final Color cor;
+
+  const _Mensagem(this.texto, {this.cor = const Color(0xFF7A7A7A)});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Text(
+        texto,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontFamily: 'NunitoSans', fontSize: 14, color: cor),
       ),
     );
   }

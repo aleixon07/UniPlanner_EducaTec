@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../model/usuario.dart';
 import '../service/usuario_service.dart';
 import '../sidebar.dart';
+import 'dialog_editar_usuario.dart';
 import 'dialog_usuario.dart';
 
 const Color _azul = Color(0xFF3750B5);
@@ -72,6 +73,38 @@ class _GerenciarUsuariosState extends State<GerenciarUsuarios> {
 
     if (nome == null || !mounted) return;
     _avisar('${widget.perfil.rotulo} "$nome" cadastrado.');
+  }
+
+  // O modal já salva no banco, e a lista se atualiza sozinha pelo stream.
+  Future<void> _editar(Usuario usuario) async {
+    final nome = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => DialogEditarUsuario(usuario: usuario),
+    );
+
+    if (nome == null || !mounted) return;
+    _avisar('${widget.perfil.rotulo} atualizado.');
+  }
+
+  Future<void> _alternarAtivo(Usuario usuario) async {
+    if (usuario.ativo) {
+      final confirmou = await confirmarDesativacaoUsuario(context, usuario);
+      if (!confirmou || !mounted) return;
+    }
+
+    try {
+      await UsuarioService.instancia.definirAtivo(usuario.id, !usuario.ativo);
+      if (!mounted) return;
+      _avisar(
+        usuario.ativo
+            ? '"${usuario.nome}" desativado.'
+            : '"${usuario.nome}" reativado.',
+      );
+    } on ErroCadastro catch (e) {
+      if (!mounted) return;
+      _avisar(e.mensagem);
+    }
   }
 
   @override
@@ -224,14 +257,8 @@ class _GerenciarUsuariosState extends State<GerenciarUsuarios> {
                         return _CardUsuario(
                           usuario: visiveis[index],
                           cinza: index.isOdd,
-                          onEditar: () => _avisar(
-                            'A edição de ${widget.perfil.rotuloPlural.toLowerCase()} '
-                            'ainda não está disponível.',
-                          ),
-                          onDesativar: () => _avisar(
-                            'A desativação de ${widget.perfil.rotuloPlural.toLowerCase()} '
-                            'ainda não está disponível.',
-                          ),
+                          onEditar: () => _editar(visiveis[index]),
+                          onDesativar: () => _alternarAtivo(visiveis[index]),
                         );
                       },
                     );
@@ -303,41 +330,42 @@ class _CardUsuario extends StatelessWidget {
                 Text(
                   usuario.nome,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'NunitoSans',
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black87,
+                    color: usuario.ativo ? Colors.black87 : Colors.black45,
                   ),
                 ),
                 Text(
-                  usuario.email,
+                  usuario.ativo ? usuario.email : '${usuario.email} • Inativo',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'NunitoSans',
                     fontSize: 12,
-                    color: Colors.black54,
+                    fontWeight: usuario.ativo ? null : FontWeight.w700,
+                    color: usuario.ativo ? Colors.black54 : _vermelho,
                   ),
                 ),
               ],
             ),
           ),
 
-          // TODO: ligar ao fluxo de edição quando ele existir.
           IconButton(
             onPressed: onEditar,
             tooltip: 'Editar',
             icon: const Icon(Icons.edit, color: _azul, size: 20),
           ),
 
-          // TODO: ligar à desativação. Desativar também precisa bloquear o
-          // login dessa conta, o que ainda não existe.
+          // Desativa; se o usuário já está inativo, o mesmo lugar reativa.
           IconButton(
             onPressed: onDesativar,
-            tooltip: 'Desativar',
-            icon: const Icon(
-              Icons.indeterminate_check_box_outlined,
-              color: _vermelho,
+            tooltip: usuario.ativo ? 'Desativar' : 'Reativar',
+            icon: Icon(
+              usuario.ativo
+                  ? Icons.indeterminate_check_box_outlined
+                  : Icons.restore,
+              color: usuario.ativo ? _vermelho : const Color(0xFF27AE60),
               size: 22,
             ),
           ),

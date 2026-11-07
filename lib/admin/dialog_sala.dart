@@ -170,8 +170,7 @@ class _DialogSalaState extends State<DialogSala> {
                       selecionado: _tipo == TipoSala.laboratorio,
                       onTap: _salvando
                           ? null
-                          : () =>
-                                setState(() => _tipo = TipoSala.laboratorio),
+                          : () => setState(() => _tipo = TipoSala.laboratorio),
                     ),
                   ),
                 ],

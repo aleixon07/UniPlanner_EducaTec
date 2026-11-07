@@ -30,6 +30,15 @@ abstract class UsuarioService {
     required String senha,
     required PerfilUsuario perfil,
   });
+
+  /// Muda o nome do usuário. O e-mail e a senha não mudam aqui: trocar a conta
+  /// de login de outra pessoa exige o Firebase Admin (Cloud Functions), que o
+  /// app não tem. Lança [ErroCadastro].
+  Future<void> editar(String id, String nome);
+
+  /// Desativa ou reativa o usuário. Um usuário desativado não consegue entrar
+  /// (veja [AuthService.entrar]). Lança [ErroCadastro].
+  Future<void> definirAtivo(String id, bool ativo);
 }
 
 class FirebaseUsuarioService implements UsuarioService {
@@ -110,6 +119,39 @@ class FirebaseUsuarioService implements UsuarioService {
       } catch (_) {
         // Falhar ao limpar o app temporário não pode esconder o resultado.
       }
+    }
+  }
+
+  @override
+  Future<void> editar(String id, String nome) async {
+    final limpo = nome.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (limpo.isEmpty) throw const ErroCadastro('Informe o nome.');
+
+    await _atualizar(id, {
+      'nome': limpo,
+      'atualizadoEm': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Future<void> definirAtivo(String id, bool ativo) {
+    return _atualizar(id, {
+      'ativo': ativo,
+      'atualizadoEm': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _atualizar(String id, Map<String, Object?> campos) async {
+    try {
+      await _colecao.doc(id).update(campos);
+    } on FirebaseException catch (e) {
+      throw ErroCadastro(switch (e.code) {
+        'permission-denied' =>
+          'Sem permissão para salvar. Verifique as regras do Firestore.',
+        'unavailable' => 'Sem conexão. Verifique sua internet.',
+        'not-found' => 'Este usuário não existe mais.',
+        _ => 'Não foi possível salvar o usuário (${e.code}).',
+      });
     }
   }
 

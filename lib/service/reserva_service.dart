@@ -68,9 +68,9 @@ class FirebaseReservaService implements ReservaService {
 
       // Filtra e ordena aqui, e não na consulta, para não precisar criar
       // índice composto no Firestore.
-      final lista = _converter(
-        resultado,
-      ).where((r) => !r.data.isBefore(hoje)).toList();
+      final lista = _converter(resultado)
+          .where((r) => !r.data.isBefore(hoje))
+          .toList();
 
       lista.sort((a, b) {
         final porData = a.data.compareTo(b.data);

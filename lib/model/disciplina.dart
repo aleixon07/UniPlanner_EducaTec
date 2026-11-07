@@ -1,44 +1,52 @@
-import 'package:flutter/material.dart';
-
-import 'sala.dart';
-
-enum DiaSemana { segunda, terca, quarta, quinta, sexta, sabado }
-
-extension DiaSemanaInfo on DiaSemana {
-  String get rotulo => switch (this) {
-    DiaSemana.segunda => 'Segunda',
-    DiaSemana.terca => 'Terça',
-    DiaSemana.quarta => 'Quarta',
-    DiaSemana.quinta => 'Quinta',
-    DiaSemana.sexta => 'Sexta',
-    DiaSemana.sabado => 'Sábado',
-  };
-}
-
-/// Um encontro semanal da disciplina. Ex.: segunda, das 19h às 20h30.
-class HorarioAula {
-  final DiaSemana dia;
-  final TimeOfDay inicio;
-  final TimeOfDay fim;
-
-  const HorarioAula({
-    required this.dia,
-    required this.inicio,
-    required this.fim,
-  });
-}
-
-/// Disciplina ofertada em um semestre de um curso.
+/// Disciplina de um semestre de um curso (por exemplo, "Banco de Dados" no
+/// 3º semestre de Sistemas de Informação).
+///
+/// Fica na coleção `disciplinas` do Firestore, com id automático. O vínculo é
+/// o [semestreId] (e o [cursoId], guardado junto para facilitar consultas).
 class Disciplina {
+  final String id;
+  final String cursoId;
+  final String semestreId;
   final String nome;
-  final String professor;
-  final Sala sala;
-  final List<HorarioAula> horarios;
+
+  /// Ids (uid) dos professores que dão esta disciplina.
+  final List<String> professorIds;
 
   const Disciplina({
+    required this.id,
+    required this.cursoId,
+    required this.semestreId,
     required this.nome,
-    required this.professor,
-    required this.sala,
-    required this.horarios,
+    this.professorIds = const [],
   });
+
+  /// Chave para comparar nomes: minúsculas, sem acentos e sem espaços
+  /// repetidos. "Cálculo  I" e "calculo i" são a mesma disciplina.
+  static String chaveNome(String nome) {
+    const com = 'áàâãäéèêëíìîïóòôõöúùûüçñ';
+    const sem = 'aaaaaeeeeiiiiooooouuuucn';
+    var chave = nome.trim().toLowerCase();
+    for (var i = 0; i < com.length; i++) {
+      chave = chave.replaceAll(com[i], sem[i]);
+    }
+    return chave.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  Map<String, Object?> toMap() => {
+    'cursoId': cursoId,
+    'semestreId': semestreId,
+    'nome': nome,
+    'nomeBusca': chaveNome(nome),
+    'professorIds': professorIds,
+  };
+
+  factory Disciplina.fromMap(String id, Map<String, dynamic> dados) {
+    return Disciplina(
+      id: id,
+      cursoId: (dados['cursoId'] as String?) ?? '',
+      semestreId: (dados['semestreId'] as String?) ?? '',
+      nome: (dados['nome'] as String?) ?? '',
+      professorIds: [...?(dados['professorIds'] as List?)?.whereType<String>()],
+    );
+  }
 }

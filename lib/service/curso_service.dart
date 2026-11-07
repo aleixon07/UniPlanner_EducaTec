@@ -1,141 +1,149 @@
-import 'package:flutter/material.dart' show TimeOfDay;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../model/curso.dart';
-import '../model/disciplina.dart';
-import '../model/sala.dart';
 
-/// Fonte de dados dos cursos.
+/// Erro de curso já traduzido para mostrar na tela.
+class ErroCurso implements Exception {
+  final String mensagem;
+  const ErroCurso(this.mensagem);
+
+  @override
+  String toString() => mensagem;
+}
+
+/// Acesso aos cursos (RF011/UC011).
 ///
-/// Por enquanto tudo fica em memória, com cursos fictícios, só para as telas
-/// funcionarem. Quando o Firestore entrar, é este arquivo que muda.
-class CursoService {
-  CursoService._();
+/// Mesmo modelo do [UsuarioService] e do [SalaService]: classe abstrata, para
+/// as telas poderem ser testadas sem Firebase trocando [instancia].
+///
+/// O CRUD é: cadastrar (create), listar/observar (read), editar e
+/// definirAtivo (update). Não existe apagar de verdade: um curso errado ou
+/// encerrado é desativado, porque disciplinas e turmas vão apontar para ele.
+abstract class CursoService {
+  static CursoService instancia = FirebaseCursoService();
 
-  static int _proximoId = 5;
+  /// Todos os cursos, ativos e inativos, em ordem alfabética, sempre
+  /// atualizados.
+  Stream<List<Curso>> listar();
 
-  static final List<Curso> _cursos = [
-    const Curso(id: '1', nome: 'Sistemas de Informação'),
-    const Curso(id: '2', nome: 'Técnico em Informática'),
-    const Curso(id: '3', nome: 'Técnico em Administração'),
-    const Curso(id: '4', nome: 'Licenciatura em Matemática', ativo: false),
-  ];
+  /// Um curso, sempre atualizado. Emite `null` se ele não existir (mais).
+  Stream<Curso?> observar(String id);
 
-  static List<Curso> get cursos => List.unmodifiable(_cursos);
+  /// Cadastra um curso. Lança [ErroCurso] se o nome já existir ou se der erro.
+  Future<void> cadastrar(String nome);
 
-  static Curso? buscar(String id) {
-    for (final curso in _cursos) {
-      if (curso.id == id) return curso;
+  /// Muda o nome do curso. Lança [ErroCurso].
+  Future<void> editar(String id, String nome);
+
+  /// Desativa ou reativa o curso. Lança [ErroCurso].
+  Future<void> definirAtivo(String id, bool ativo);
+}
+
+class FirebaseCursoService implements CursoService {
+  // Só toca no Firebase quando é usado, para criar o objeto não exigir
+  // Firebase.initializeApp().
+  CollectionReference<Map<String, dynamic>> get _colecao =>
+      FirebaseFirestore.instance.collection('cursos');
+
+  @override
+  Stream<List<Curso>> listar() {
+    return _colecao.snapshots().map((resultado) {
+      final lista = resultado.docs
+          .map((doc) => Curso.fromMap(doc.id, doc.data()))
+          .toList();
+      lista.sort(
+        (a, b) => Curso.chaveNome(a.nome).compareTo(Curso.chaveNome(b.nome)),
+      );
+      return lista;
+    });
+  }
+
+  @override
+  Stream<Curso?> observar(String id) {
+    return _colecao.doc(id).snapshots().map((doc) {
+      final dados = doc.data();
+      return dados == null ? null : Curso.fromMap(doc.id, dados);
+    });
+  }
+
+  @override
+  Future<void> cadastrar(String nome) async {
+    final limpo = _limpar(nome);
+
+    try {
+      await _garantirNomeLivre(limpo);
+      await _colecao.add({
+        ...Curso(id: '', nome: limpo).toMap(),
+        'criadoEm': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      throw ErroCurso(_traduzir(e.code));
     }
-    return null;
   }
 
-  /// Compara sem diferenciar maiúsculas de minúsculas. [ignorarId] serve para
-  /// o curso que está sendo editado não conflitar com ele mesmo.
-  static bool nomeJaExiste(String nome, {String? ignorarId}) {
-    final procurado = nome.trim().toLowerCase();
-    return _cursos.any(
-      (curso) =>
-          curso.id != ignorarId && curso.nome.trim().toLowerCase() == procurado,
-    );
+  @override
+  Future<void> editar(String id, String nome) async {
+    final limpo = _limpar(nome);
+
+    try {
+      await _garantirNomeLivre(limpo, ignorarId: id);
+      await _colecao.doc(id).update({
+        'nome': limpo,
+        'nomeBusca': Curso.chaveNome(limpo),
+        'atualizadoEm': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      throw ErroCurso(_traduzir(e.code));
+    }
   }
 
-  static Curso adicionar(String nome) {
-    final curso = Curso(id: '${_proximoId++}', nome: nome.trim());
-    _cursos.add(curso);
-    return curso;
+  @override
+  Future<void> definirAtivo(String id, bool ativo) async {
+    try {
+      await _colecao.doc(id).update({
+        'ativo': ativo,
+        'atualizadoEm': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      throw ErroCurso(_traduzir(e.code));
+    }
   }
 
-  static void editar(String id, String nome) {
-    _atualizar(id, (curso) => curso.copyWith(nome: nome.trim()));
+  /// Tira espaços das pontas e repetidos no meio, e recusa nome vazio.
+  String _limpar(String nome) {
+    final limpo = nome.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (limpo.isEmpty) throw const ErroCurso('Informe o nome do curso.');
+    return limpo;
   }
 
-  /// Quantos semestres a tela do curso lista.
-  /// TODO: virar um campo do [Curso], porque nem todo curso tem 8 semestres.
-  static const int semestresPorCurso = 8;
-
-  /// Disciplinas ofertadas em um semestre do curso.
+  /// Procura outro curso com o mesmo nome (ignorando maiúsculas, acentos e
+  /// espaços). [ignorarId] é o curso que está sendo editado, para ele não
+  /// conflitar consigo mesmo.
   ///
-  /// Dados fictícios só para a tela ter o que mostrar: apenas o curso '1'
-  /// (Sistemas de Informação) tem disciplinas, e só em alguns semestres.
-  /// Quando o cadastro de disciplinas existir, é aqui que a busca real entra.
-  static List<Disciplina> disciplinasDoSemestre(String cursoId, int semestre) {
-    if (cursoId != '1') return const [];
-    return _disciplinasFicticias[semestre] ?? const [];
+  /// A checagem e a gravação são dois passos, então dois administradores
+  /// cadastrando o mesmo nome no mesmo instante poderiam passar os dois. Para
+  /// uma tela de administração isso é aceitável; se virar problema, o caminho
+  /// é um documento-trava por nome dentro de uma transação.
+  Future<void> _garantirNomeLivre(String nome, {String? ignorarId}) async {
+    final iguais = await _colecao
+        .where('nomeBusca', isEqualTo: Curso.chaveNome(nome))
+        .get();
+
+    if (iguais.docs.any((doc) => doc.id != ignorarId)) {
+      throw const ErroCurso('Já existe um curso com esse nome.');
+    }
   }
 
-  static const Map<int, List<Disciplina>> _disciplinasFicticias = {
-    1: [
-      Disciplina(
-        nome: 'Lógica de Programação',
-        professor: 'Ana Souza',
-        sala: Sala(numero: '305', tipo: TipoSala.sala, andar: '3º Andar'),
-        horarios: [
-          HorarioAula(
-            dia: DiaSemana.terca,
-            inicio: TimeOfDay(hour: 19, minute: 0),
-            fim: TimeOfDay(hour: 20, minute: 30),
-          ),
-        ],
-      ),
-    ],
-    2: [
-      Disciplina(
-        nome: 'Estrutura de Dados',
-        professor: 'Bruno da Silva',
-        sala: Sala(numero: '301', tipo: TipoSala.sala, andar: '3º Andar'),
-        horarios: [
-          HorarioAula(
-            dia: DiaSemana.segunda,
-            inicio: TimeOfDay(hour: 19, minute: 0),
-            fim: TimeOfDay(hour: 20, minute: 30),
-          ),
-          HorarioAula(
-            dia: DiaSemana.quinta,
-            inicio: TimeOfDay(hour: 21, minute: 0),
-            fim: TimeOfDay(hour: 22, minute: 30),
-          ),
-        ],
-      ),
-      Disciplina(
-        nome: 'Banco de Dados',
-        professor: 'Marcos Lima',
-        sala: Sala(
-          numero: '402',
-          tipo: TipoSala.laboratorio,
-          andar: '4º Andar',
-        ),
-        horarios: [
-          HorarioAula(
-            dia: DiaSemana.quarta,
-            inicio: TimeOfDay(hour: 19, minute: 0),
-            fim: TimeOfDay(hour: 22, minute: 30),
-          ),
-        ],
-      ),
-    ],
-    4: [
-      Disciplina(
-        nome: 'Engenharia de Software',
-        professor: 'Ana Souza',
-        sala: Sala(numero: '308', tipo: TipoSala.sala, andar: '3º Andar'),
-        horarios: [
-          HorarioAula(
-            dia: DiaSemana.sexta,
-            inicio: TimeOfDay(hour: 19, minute: 0),
-            fim: TimeOfDay(hour: 22, minute: 30),
-          ),
-        ],
-      ),
-    ],
-  };
-
-  static void definirAtivo(String id, bool ativo) {
-    _atualizar(id, (curso) => curso.copyWith(ativo: ativo));
-  }
-
-  static void _atualizar(String id, Curso Function(Curso) mudar) {
-    final indice = _cursos.indexWhere((curso) => curso.id == id);
-    if (indice == -1) return;
-    _cursos[indice] = mudar(_cursos[indice]);
+  String _traduzir(String codigo) {
+    switch (codigo) {
+      case 'permission-denied':
+        return 'Sem permissão para salvar. Verifique as regras do Firestore.';
+      case 'unavailable':
+        return 'Sem conexão. Verifique sua internet.';
+      case 'not-found':
+        return 'Este curso não existe mais.';
+      default:
+        return 'Não foi possível salvar o curso ($codigo).';
+    }
   }
 }
