@@ -14,6 +14,13 @@ extension TurnoInfo on Turno {
     }
   }
 
+  /// Hora em que o turno começa (a mesma do início de [horario]).
+  ({int hora, int minuto}) get inicio => switch (this) {
+    Turno.manha => (hora: 7, minuto: 30),
+    Turno.tarde => (hora: 13, minuto: 30),
+    Turno.noite => (hora: 19, minuto: 0),
+  };
+
   String get horario {
     switch (this) {
       case Turno.manha:
@@ -34,7 +41,15 @@ extension TurnoInfo on Turno {
 class Reserva {
   final String id;
   final Sala sala;
+
+  /// Nome da disciplina, copiado para a lista continuar legível mesmo se a
+  /// disciplina for renomeada ou excluída depois.
   final String disciplina;
+
+  /// Id da disciplina em `disciplinas` (vazio em reservas antigas, feitas
+  /// antes do cadastro de disciplinas existir).
+  final String disciplinaId;
+
   final Turno turno;
 
   /// Só o dia importa; a hora fica sempre em 00:00.
@@ -47,6 +62,7 @@ class Reserva {
     this.id = '',
     required this.sala,
     required this.disciplina,
+    this.disciplinaId = '',
     required this.turno,
     required this.data,
     this.usuarioId = '',
@@ -93,6 +109,7 @@ class Reserva {
     'salaTipo': sala.tipo.name,
     'salaAndar': sala.andar,
     'disciplina': disciplina,
+    'disciplinaId': disciplinaId,
     'turno': turno.name,
     'dia': chaveDia(data),
     'usuarioId': usuarioId,
@@ -116,6 +133,7 @@ class Reserva {
         andar: (dados['salaAndar'] as String?) ?? '',
       ),
       disciplina: (dados['disciplina'] as String?) ?? '',
+      disciplinaId: (dados['disciplinaId'] as String?) ?? '',
       turno: Turno.values.firstWhere(
         (t) => t.name == dados['turno'],
         orElse: () => Turno.manha,

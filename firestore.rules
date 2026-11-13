@@ -1,0 +1,140 @@
+rules_version = '2';
+
+// Regras de segurança do UniPlanner, por perfil (RF002).
+//
+// O perfil vem do cadastro em /usuarios/{uid}: aluno, professor ou
+// administrador. Quem está desativado (ativo == false) perde o acesso na hora,
+// mesmo que ainda esteja com o app aberto.
+//
+// ATENÇÃO antes de publicar: entre no app uma vez com a conta de
+// administrador. Esse primeiro login cria o cadastro do primeiro administrador;
+// com estas regras publicadas, só um administrador cria cadastros.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------
+    // QUEM É QUEM
+    // ---------------------------------------------------------------
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function cadastro() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    // Logado, com cadastro, e não desativado.
+    function ativo() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && cadastro().get('ativo', true) == true;
+    }
+
+    function admin() {
+      return ativo() && cadastro().perfil == 'administrador';
+    }
+
+    function souEu(uid) {
+      return autenticado() && request.auth.uid == uid;
+    }
+
+    // ---------------------------------------------------------------
+    // USUÁRIOS
+    // ---------------------------------------------------------------
+    match /usuarios/{uid} {
+      // Qualquer conta autenticada lê (o login lê o próprio cadastro antes de
+      // saber o perfil; as telas mostram nomes de professores e alunos).
+      allow read: if autenticado();
+
+      // Só o administrador cadastra, edita, desativa e apaga.
+      allow create, delete: if admin();
+      allow update: if admin()
+        // A própria pessoa só pode marcar que trocou a senha temporária.
+        || (souEu(uid)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['senhaTemporaria', 'atualizadoEm'])
+            && request.resource.data.senhaTemporaria == false);
+    }
+
+    // ---------------------------------------------------------------
+    // ESTRUTURA ACADÊMICA E SALAS: todos leem, só o administrador mexe.
+    // ---------------------------------------------------------------
+    match /cursos/{id} {
+      allow read: if ativo();
+      allow write: if admin();
+    }
+    match /semestres/{id} {
+      allow read: if ativo();
+      allow write: if admin();
+    }
+    match /disciplinas/{id} {
+      allow read: if ativo();
+      allow write: if admin();
+    }
+    match /horarios/{id} {
+      allow read: if ativo();
+      allow write: if admin();
+    }
+    match /salas/{id} {
+      allow read: if ativo();
+      allow write: if admin();
+    }
+
+    // ---------------------------------------------------------------
+    // CONFIGURAÇÕES (período de matrícula)
+    // ---------------------------------------------------------------
+    match /config/{id} {
+      allow read: if ativo();
+      allow write: if admin();
+    }
+
+    // ---------------------------------------------------------------
+    // RESERVAS: qualquer pessoa ativa reserva em nome próprio; cancela a
+    // própria. O administrador cancela qualquer uma.
+    // ---------------------------------------------------------------
+    match /reservas/{id} {
+      allow read: if ativo();
+      allow create: if ativo()
+        && request.resource.data.usuarioId == request.auth.uid;
+      allow delete: if admin()
+        || (ativo() && resource.data.usuarioId == request.auth.uid);
+      allow update: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // MATRÍCULAS: o aluno se matricula (e cancela) sozinho só dentro do
+    // período e nos semestres liberados. O administrador, a qualquer momento.
+    // ---------------------------------------------------------------
+    function periodoAberto(semestreId) {
+      let cfg = get(/databases/$(database)/documents/config/matricula).data;
+      let numero = get(/databases/$(database)/documents/semestres/$(semestreId)).data.numero;
+      return cfg.inicio != null && cfg.fim != null
+        && cfg.inicio <= request.time && request.time <= cfg.fim
+        && numero in cfg.semestres;
+    }
+
+    match /matriculas/{id} {
+      allow read: if ativo();
+      allow create: if admin()
+        || (ativo() && cadastro().perfil == 'aluno'
+            && request.resource.data.alunoId == request.auth.uid
+            && id == request.auth.uid + '_' + request.resource.data.disciplinaId
+            && exists(/databases/$(database)/documents/disciplinas/$(request.resource.data.disciplinaId))
+            && periodoAberto(request.resource.data.semestreId));
+      allow delete: if admin()
+        || (ativo() && resource.data.alunoId == request.auth.uid
+            && periodoAberto(resource.data.semestreId));
+      allow update: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // AVISOS: pessoais, cada um vê e mexe só nos seus.
+    // ---------------------------------------------------------------
+    match /avisos/{id} {
+      allow read, delete: if ativo() && resource.data.autorId == request.auth.uid;
+      allow create: if ativo() && request.resource.data.autorId == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}

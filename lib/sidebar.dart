@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 
 import 'admin/gerenciar_cursos.dart';
+import 'admin/gerenciar_matriculas.dart';
+import 'admin/gerenciar_reservas.dart';
 import 'admin/gerenciar_salas.dart';
 import 'admin/gerenciar_usuarios.dart';
+import 'login.dart';
 import 'model/usuario.dart';
+import 'service/auth_service.dart';
+import 'service/sessao.dart';
 import 'usuario/principal.dart';
 import 'usuario/reservar_sala.dart';
+import 'usuario/tela_matricula.dart';
 
+/// Menu lateral. Os itens dependem do perfil de quem está logado (RF002):
+/// aluno e professor veem a agenda e a reserva de salas; só o administrador
+/// vê a área administrativa (cursos, usuários e salas).
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
 
@@ -21,167 +30,158 @@ class _SidebarState extends State<Sidebar> {
   final Color azul = const Color(0xFF3750B5);
   final Color azulSelecionado = const Color(0xFF5A70C7);
 
-  void _abrirUsuarios(PerfilUsuario perfil) {
+  void _abrir(Widget tela) {
     Navigator.pop(context);
+    Navigator.push(context, MaterialPageRoute(builder: (context) => tela));
+  }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => GerenciarUsuarios(perfil: perfil),
-      ),
+  Future<void> _sair() async {
+    final navigator = Navigator.of(context);
+    await AuthService.sair();
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const Login()),
+      (rota) => false,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final usuario = Sessao.usuario;
+    final admin = Sessao.ehAdmin;
+
     return Drawer(
       width: 240,
       backgroundColor: azul,
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.only(top: 20),
+        child: Column(
           children: [
-            // =========================
-            // TELA PRINCIPAL
-            // =========================
-
-            _itemMenu(
-              titulo: 'Tela Principal',
-              onTap: () {
-                Navigator.pop(context);
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TelaInicial()),
-                );
-              },
-            ),
-
-            const SizedBox(height: 4),
-
-            // =========================
-            // RESERVAR SALA
-            // =========================
-            _itemMenu(
-              titulo: 'Reservar Sala',
-              onTap: () {
-                Navigator.pop(context);
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ReservarSala()),
-                );
-              },
-            ),
-
-            const SizedBox(height: 4),
-
-            // =========================
-            // ADMIN
-            // =========================
-            // TODO: mostrar só para o perfil Administrador (RF002), quando o
-            // perfil do usuário logado estiver disponível.
-            _itemMenu(
-              titulo: 'Admin',
-              onTap: () {
-                Navigator.pop(context);
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const GerenciarCursos(),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 4),
-
-            // =========================
-            // GERENCIAR USUÁRIOS
-            // =========================
-            _itemExpandivel(
-              titulo: 'Gerenciar Usuários',
-              aberto: usuariosAberto,
-              onTap: () {
-                setState(() {
-                  usuariosAberto = !usuariosAberto;
-                });
-              },
-            ),
-
-            if (usuariosAberto) ...[
-              _subItem(
-                titulo: 'Aluno',
-                onTap: () => _abrirUsuarios(PerfilUsuario.aluno),
-              ),
-
-              _subItem(
-                titulo: 'Professor',
-                onTap: () => _abrirUsuarios(PerfilUsuario.professor),
-              ),
-            ],
-
-            const SizedBox(height: 4),
-
-            // =========================
-            // GERENCIAR SALAS
-            // =========================
-            _itemExpandivel(
-              titulo: 'Gerenciar Salas',
-              aberto: salasAberto,
-              onTap: () {
-                setState(() {
-                  salasAberto = !salasAberto;
-                });
-              },
-            ),
-
-            if (salasAberto) ...[
-              _subItem(
-                titulo: 'Salas',
-                onTap: () {
-                  Navigator.pop(context);
-
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const GerenciarSalas(),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(top: 20),
+                children: [
+                  // QUEM ESTÁ LOGADO
+                  if (usuario != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            usuario.nome,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            usuario.perfil.rotulo,
+                            style: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                              fontSize: 13,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                },
+
+                  _itemMenu(
+                    titulo: 'Tela Principal',
+                    onTap: () => _abrir(const TelaInicial()),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  _itemMenu(
+                    titulo: 'Reservar Sala',
+                    onTap: () => _abrir(const ReservarSala()),
+                  ),
+
+                  // MATRÍCULA: só alunos.
+                  if (Sessao.ehAluno) ...[
+                    const SizedBox(height: 4),
+                    _itemMenu(
+                      titulo: 'Matrícula',
+                      onTap: () => _abrir(const TelaMatricula()),
+                    ),
+                  ],
+
+                  // ÁREA ADMINISTRATIVA: só administradores.
+                  if (admin) ...[
+                    const SizedBox(height: 4),
+
+                    _itemMenu(
+                      titulo: 'Admin',
+                      onTap: () => _abrir(const GerenciarCursos()),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    _itemMenu(
+                      titulo: 'Período de Matrícula',
+                      onTap: () => _abrir(const GerenciarMatriculas()),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    _itemExpandivel(
+                      titulo: 'Gerenciar Usuários',
+                      aberto: usuariosAberto,
+                      onTap: () =>
+                          setState(() => usuariosAberto = !usuariosAberto),
+                    ),
+
+                    if (usuariosAberto) ...[
+                      for (final perfil in PerfilUsuario.values)
+                        _subItem(
+                          titulo: perfil.rotulo,
+                          onTap: () =>
+                              _abrir(GerenciarUsuarios(perfil: perfil)),
+                        ),
+                    ],
+
+                    const SizedBox(height: 4),
+
+                    _itemExpandivel(
+                      titulo: 'Gerenciar Salas',
+                      aberto: salasAberto,
+                      onTap: () => setState(() => salasAberto = !salasAberto),
+                    ),
+
+                    if (salasAberto) ...[
+                      _subItem(
+                        titulo: 'Salas',
+                        onTap: () => _abrir(const GerenciarSalas()),
+                      ),
+
+                      _subItem(
+                        titulo: 'Reservas',
+                        onTap: () => _abrir(const GerenciarReservas()),
+                      ),
+                    ],
+                  ],
+                ],
               ),
-
-              _subItem(
-                titulo: 'Reservas',
-                onTap: () {
-                  // TODO: abrir tela de reservas
-                },
-              ),
-            ],
-
-            const SizedBox(height: 20),
-
-            // =========================
-            // ADICIONAR MATERIAS
-            // =========================
-            _itemMenu(
-              titulo: 'Adicionar Materias',
-              onTap: () {
-                // TODO: abrir tela de matérias
-              },
             ),
 
-            const SizedBox(height: 4),
-
-            // =========================
-            // TROCAR DE CURSO
-            // =========================
-            _itemMenu(
-              titulo: 'Trocar de Curso',
-              onTap: () {
-                // TODO: abrir tela de troca de curso
-              },
+            // SAIR
+            const Divider(color: Colors.white24, height: 1),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.logout, color: Colors.white),
+              title: const Text(
+                'Sair',
+                style: TextStyle(
+                  fontFamily: 'NunitoSans',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+              onTap: _sair,
             ),
           ],
         ),

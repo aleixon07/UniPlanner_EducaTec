@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'senha/dialog_trocar_senha.dart';
 import 'senha/recuperar_senha.dart';
 import 'service/auth_service.dart';
+import 'service/lembretes.dart';
 import 'sidebar.dart';
 import 'usuario/principal.dart';
 
@@ -42,9 +46,25 @@ class _LoginState extends State<Login> {
     });
 
     try {
-      await AuthService.entrar(email: email, senha: senha);
+      final usuario = await AuthService.entrar(email: email, senha: senha);
       if (!mounted) return;
 
+      // Primeiro acesso: só entra depois de trocar a senha temporária.
+      if (usuario.senhaTemporaria) {
+        final trocou = await abrirTrocaDeSenha(context, senhaTemporaria: senha);
+        if (!trocou) {
+          await AuthService.sair();
+          if (!mounted) return;
+          setState(() => _carregando = false);
+          return;
+        }
+        if (!mounted) return;
+      }
+
+      // Agenda os lembretes de aula deste usuário (não precisa esperar).
+      unawaited(Lembretes.iniciarPara(usuario));
+
+      _senhaController.clear();
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const TelaInicial()),
@@ -96,8 +116,6 @@ class _LoginState extends State<Login> {
 
                     const SizedBox(height: 25),
 
-                    // TODO(RF001): voltar para CPF quando o mapeamento
-                    // CPF -> credencial do Firebase for definido.
                     SizedBox(
                       width: 300,
                       child: TextField(

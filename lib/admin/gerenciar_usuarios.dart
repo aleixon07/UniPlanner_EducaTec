@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../model/curso.dart';
 import '../model/usuario.dart';
+import '../service/curso_service.dart';
+import '../service/sessao.dart';
 import '../service/usuario_service.dart';
 import '../sidebar.dart';
 import 'dialog_editar_usuario.dart';
@@ -23,7 +28,8 @@ String _paraBusca(String texto) {
   return saida.toString();
 }
 
-/// Lista, busca e cadastra alunos ou professores, conforme o [perfil].
+/// Lista, busca e cadastra alunos, professores ou administradores, conforme o
+/// [perfil].
 /// Os dados vêm do Firestore e a lista se atualiza sozinha.
 class GerenciarUsuarios extends StatefulWidget {
   final PerfilUsuario perfil;
@@ -45,8 +51,24 @@ class _GerenciarUsuariosState extends State<GerenciarUsuarios> {
 
   String _busca = '';
 
+  // id do curso -> nome, para mostrar o curso de cada aluno. Só alunos têm curso.
+  Map<String, String> _nomesCursos = {};
+  StreamSubscription<List<Curso>>? _assinaturaCursos;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.perfil == PerfilUsuario.aluno) {
+      _assinaturaCursos = CursoService.instancia.listar().listen((cursos) {
+        if (!mounted) return;
+        setState(() => _nomesCursos = {for (final c in cursos) c.id: c.nome});
+      }, onError: (_) {});
+    }
+  }
+
   @override
   void dispose() {
+    _assinaturaCursos?.cancel();
     _buscaController.dispose();
     super.dispose();
   }
@@ -88,6 +110,13 @@ class _GerenciarUsuariosState extends State<GerenciarUsuarios> {
   }
 
   Future<void> _alternarAtivo(Usuario usuario) async {
+    // Desativar a si mesmo trancaria a pessoa fora do app (e, se for o único
+    // administrador, ninguém mais entraria na área administrativa).
+    if (usuario.ativo && usuario.id == Sessao.usuario?.id) {
+      _avisar('Você não pode desativar a sua própria conta.');
+      return;
+    }
+
     if (usuario.ativo) {
       final confirmou = await confirmarDesativacaoUsuario(context, usuario);
       if (!confirmou || !mounted) return;
@@ -256,6 +285,7 @@ class _GerenciarUsuariosState extends State<GerenciarUsuarios> {
                       itemBuilder: (context, index) {
                         return _CardUsuario(
                           usuario: visiveis[index],
+                          curso: _nomesCursos[visiveis[index].cursoId],
                           cinza: index.isOdd,
                           onEditar: () => _editar(visiveis[index]),
                           onDesativar: () => _alternarAtivo(visiveis[index]),
@@ -299,12 +329,14 @@ class _Mensagem extends StatelessWidget {
 // ================================================================
 class _CardUsuario extends StatelessWidget {
   final Usuario usuario;
+  final String? curso;
   final bool cinza;
   final VoidCallback onEditar;
   final VoidCallback onDesativar;
 
   const _CardUsuario({
     required this.usuario,
+    this.curso,
     required this.cinza,
     required this.onEditar,
     required this.onDesativar,
@@ -347,6 +379,17 @@ class _CardUsuario extends StatelessWidget {
                     color: usuario.ativo ? Colors.black54 : _vermelho,
                   ),
                 ),
+                if (curso != null)
+                  Text(
+                    curso!,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'NunitoSans',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _azulEscuro,
+                    ),
+                  ),
               ],
             ),
           ),

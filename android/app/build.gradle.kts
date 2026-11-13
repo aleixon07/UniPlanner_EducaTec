@@ -9,10 +9,14 @@ plugins {
 
 android {
     namespace = "br.com.educatec.uniplanner"
-    compileSdk = flutter.compileSdkVersion
+    // 37: exigido pelas bibliotecas do flutter_local_notifications. Só afeta a
+    // compilação; minSdk e targetSdk continuam os do Flutter.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Exigido pelo flutter_local_notifications (lembretes de aula).
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -49,4 +53,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

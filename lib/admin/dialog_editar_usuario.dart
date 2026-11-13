@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../model/usuario.dart';
 import '../service/usuario_service.dart';
+import 'select_curso.dart';
 
 const Color _azulEscuro = Color(0xFF203F7D);
 const Color _verde = Color(0xFF27AE60);
@@ -25,6 +26,7 @@ class _DialogEditarUsuarioState extends State<DialogEditarUsuario> {
   late final TextEditingController _nomeController = TextEditingController(
     text: widget.usuario.nome,
   );
+  late String? _cursoId = widget.usuario.cursoId;
   String? _erro;
   bool _salvando = false;
 
@@ -47,7 +49,11 @@ class _DialogEditarUsuarioState extends State<DialogEditarUsuario> {
     });
 
     try {
-      await UsuarioService.instancia.editar(widget.usuario.id, nome);
+      await UsuarioService.instancia.editar(
+        widget.usuario,
+        nome,
+        cursoId: _cursoId,
+      );
       if (!mounted) return;
       Navigator.pop(context, nome);
     } on ErroCadastro catch (e) {
@@ -126,6 +132,14 @@ class _DialogEditarUsuarioState extends State<DialogEditarUsuario> {
                 style: const TextStyle(fontFamily: 'NunitoSans'),
                 decoration: _decoracao('E-mail (não pode ser alterado)'),
               ),
+              if (widget.usuario.perfil == PerfilUsuario.aluno) ...[
+                const SizedBox(height: 12),
+                SelectCurso(
+                  valor: _cursoId,
+                  habilitado: !_salvando,
+                  onChanged: (valor) => setState(() => _cursoId = valor),
+                ),
+              ],
               const SizedBox(height: 20),
               Row(
                 children: [

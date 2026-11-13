@@ -2,19 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../model/usuario.dart';
 import '../service/usuario_service.dart';
+import '../senha/politica_senha.dart';
+import 'select_curso.dart';
 
 const Color _azulEscuro = Color(0xFF203F7D);
 const Color _verde = Color(0xFF27AE60);
 const Color _vermelho = Color(0xFFE23B3B);
-
-/// Valida a senha da conta nova. Devolve a mensagem de erro, ou `null` se a
-/// senha for aceita.
-String? validarSenha(String senha) {
-  // TODO(human): defina a política de senha. Hoje só exige 6 caracteres, que é
-  // o mínimo do Firebase. Dá para exigir mais (tamanho, número, letra...).
-  if (senha.length < 6) return 'A senha precisa ter pelo menos 6 caracteres.';
-  return null;
-}
 
 String? _validarNome(String nome) {
   return nome.trim().isEmpty ? 'Informe o nome.' : null;
@@ -29,7 +22,8 @@ String? _validarEmail(String email) {
   return null;
 }
 
-/// Modal para cadastrar um aluno ou professor: nome, e-mail e senha.
+/// Modal para cadastrar um aluno, professor ou administrador: nome e e-mail
+/// (e o curso, para aluno). A senha é temporária, gerada a partir do nome.
 ///
 /// Faz o cadastro de verdade ao confirmar (cria a conta e salva no banco) e só
 /// fecha se der certo, devolvendo o nome cadastrado. Se der erro, mostra a
@@ -46,37 +40,33 @@ class DialogUsuario extends StatefulWidget {
 class _DialogUsuarioState extends State<DialogUsuario> {
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
-  final _senhaController = TextEditingController();
 
   String? _erroNome;
   String? _erroEmail;
-  String? _erroSenha;
   String? _erroGeral;
 
-  bool _senhaVisivel = false;
+  String? _cursoId;
   bool _salvando = false;
 
   @override
   void dispose() {
     _nomeController.dispose();
     _emailController.dispose();
-    _senhaController.dispose();
     super.dispose();
   }
 
   Future<void> _cadastrar() async {
     final nome = _nomeController.text.trim();
     final email = _emailController.text.trim();
-    final senha = _senhaController.text;
+    final senha = senhaTemporariaPara(nome);
 
     setState(() {
       _erroNome = _validarNome(nome);
       _erroEmail = _validarEmail(email);
-      _erroSenha = validarSenha(senha);
       _erroGeral = null;
     });
 
-    if (_erroNome != null || _erroEmail != null || _erroSenha != null) return;
+    if (_erroNome != null || _erroEmail != null) return;
 
     setState(() => _salvando = true);
 
@@ -86,6 +76,7 @@ class _DialogUsuarioState extends State<DialogUsuario> {
         email: email,
         senha: senha,
         perfil: widget.perfil,
+        cursoId: _cursoId,
       );
       if (!mounted) return;
       Navigator.pop(context, nome);
@@ -157,6 +148,7 @@ class _DialogUsuarioState extends State<DialogUsuario> {
                 controller: _nomeController,
                 enabled: !_salvando,
                 autofocus: true,
+                onChanged: (_) => setState(() {}),
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
                 style: const TextStyle(fontFamily: 'NunitoSans'),
@@ -170,36 +162,68 @@ class _DialogUsuarioState extends State<DialogUsuario> {
                 enabled: !_salvando,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                textInputAction: TextInputAction.next,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _cadastrar(),
                 style: const TextStyle(fontFamily: 'NunitoSans'),
                 decoration: _decoracao('E-mail', erro: _erroEmail),
               ),
 
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _senhaController,
-                enabled: !_salvando,
-                obscureText: !_senhaVisivel,
-                autocorrect: false,
-                enableSuggestions: false,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _cadastrar(),
-                style: const TextStyle(fontFamily: 'NunitoSans'),
-                decoration: _decoracao(
-                  'Senha',
-                  erro: _erroSenha,
-                  sufixo: IconButton(
-                    tooltip: _senhaVisivel ? 'Ocultar senha' : 'Mostrar senha',
-                    icon: Icon(
-                      _senhaVisivel ? Icons.visibility_off : Icons.visibility,
-                      size: 20,
+              // SENHA TEMPORÁRIA: gerada a partir do nome. A pessoa é obrigada
+              // a trocá-la no primeiro login.
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3E8F8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Senha temporária',
+                      style: TextStyle(
+                        fontFamily: 'NunitoSans',
+                        fontSize: 12,
+                        color: Color(0xFF4A4A4A),
+                      ),
                     ),
-                    onPressed: () =>
-                        setState(() => _senhaVisivel = !_senhaVisivel),
-                  ),
+                    const SizedBox(height: 2),
+                    SelectableText(
+                      _nomeController.text.trim().isEmpty
+                          ? 'Preencha o nome'
+                          : senhaTemporariaPara(_nomeController.text),
+                      style: const TextStyle(
+                        fontFamily: 'NunitoSans',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _azulEscuro,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Passe para a pessoa. No primeiro acesso ela terá que '
+                      'criar uma senha nova.',
+                      style: TextStyle(
+                        fontFamily: 'NunitoSans',
+                        fontSize: 12,
+                        color: Color(0xFF4A4A4A),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+
+              if (widget.perfil == PerfilUsuario.aluno) ...[
+                const SizedBox(height: 12),
+                SelectCurso(
+                  valor: _cursoId,
+                  habilitado: !_salvando,
+                  onChanged: (valor) => setState(() => _cursoId = valor),
+                ),
+              ],
 
               if (_erroGeral != null) ...[
                 const SizedBox(height: 12),

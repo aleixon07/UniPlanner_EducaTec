@@ -11,6 +11,7 @@ import 'dialog_curso.dart';
 import 'dialog_disciplina.dart';
 import 'dialog_semestre.dart';
 import 'tela_disciplina.dart';
+import 'tela_grade_horarios.dart';
 
 const Color _azul = Color(0xFF3750B5);
 const Color _azulEscuro = Color(0xFF203F7D);
@@ -170,6 +171,7 @@ class _TelaCursoState extends State<TelaCurso> {
                         _adicionarDisciplina(semestre, nome),
                     onAbrirDisciplina: (d) =>
                         _abrirDisciplina(curso, semestre, d),
+                    onAbrirGrade: () => _abrirGrade(curso, semestre),
                     onEditarDisciplina: _editarDisciplina,
                     onExcluirDisciplina: _excluirDisciplina,
                   ),
@@ -227,6 +229,15 @@ class _TelaCursoState extends State<TelaCurso> {
     } catch (_) {
       return 'Erro inesperado ao adicionar a disciplina.';
     }
+  }
+
+  void _abrirGrade(Curso curso, Semestre semestre) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaGradeHorarios(curso: curso, semestre: semestre),
+      ),
+    );
   }
 
   void _abrirDisciplina(Curso curso, Semestre semestre, Disciplina disciplina) {
@@ -445,6 +456,7 @@ class _Semestre extends StatelessWidget {
   final VoidCallback onExcluir;
   final Future<String?> Function(String nome) onAdicionarDisciplina;
   final void Function(Disciplina) onAbrirDisciplina;
+  final VoidCallback onAbrirGrade;
   final void Function(Disciplina) onEditarDisciplina;
   final void Function(Disciplina) onExcluirDisciplina;
 
@@ -458,6 +470,7 @@ class _Semestre extends StatelessWidget {
     required this.onExcluir,
     required this.onAdicionarDisciplina,
     required this.onAbrirDisciplina,
+    required this.onAbrirGrade,
     required this.onEditarDisciplina,
     required this.onExcluirDisciplina,
   });
@@ -558,6 +571,24 @@ class _Semestre extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // GRADE DE HORÁRIOS DESTE SEMESTRE
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onAbrirGrade,
+            icon: const Icon(Icons.calendar_view_week, size: 18),
+            label: const Text(
+              'Grade de horários',
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: TextButton.styleFrom(foregroundColor: _azul),
+          ),
+        ),
+        const SizedBox(height: 4),
+
         if (erroDisciplinas)
           const _Mensagem(
             'Não foi possível carregar as disciplinas.',

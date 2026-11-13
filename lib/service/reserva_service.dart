@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../model/horario.dart';
 import '../model/reserva.dart';
 import '../model/sala.dart';
 import 'auth_service.dart';
+import 'horario_service.dart';
 
 /// Erro de reserva já traduzido para mostrar na tela.
 class ErroReserva implements Exception {
@@ -20,21 +22,21 @@ class ErroReserva implements Exception {
 abstract class ReservaService {
   static ReservaService instancia = FirebaseReservaService();
 
-  // TODO: virar as disciplinas reais do curso quando o cadastro existir.
-  static const List<String> disciplinas = [
-    'Interface Humano Computador',
-    'Programação T30',
-    'Programação T31',
-    'Banco de Dados',
-    'Engenharia de Software',
-  ];
-
   /// Reservas do usuário logado, de hoje em diante, em ordem de data e turno.
   Stream<List<Reserva>> minhasReservas();
 
   /// Todas as reservas de uma sala (de qualquer usuário). Usado pelo
   /// calendário para pintar os dias ocupados.
   Stream<List<Reserva>> reservasDaSala(Sala sala);
+
+  /// Todas as reservas de todos os usuários, de hoje em diante, em ordem de
+  /// data e turno. Usado pelo administrador (UC006).
+  Stream<List<Reserva>> todas();
+
+  /// Reservas (de qualquer pessoa) das disciplinas, de hoje em diante. Assim o
+  /// aluno vê em "Aulas do Dia" a aula extra ou a troca de sala que o
+  /// professor reservou.
+  Stream<List<Reserva>> dasDisciplinas(List<String> disciplinaIds);
 
   /// Salva a reserva em nome do usuário logado. Lança [ErroReserva] se a sala
   /// já estiver ocupada nesse dia e turno, ou se der erro.
@@ -50,8 +52,7 @@ class FirebaseReservaService implements ReservaService {
 
   List<Reserva> _converter(QuerySnapshot<Map<String, dynamic>> resultado) {
     return [
-      for (final doc in resultado.docs)
-        if (Reserva.fromMap(doc.id, doc.data()) case final reserva?) reserva,
+      for (final doc in resultado.docs) ?Reserva.fromMap(doc.id, doc.data()),
     ];
   }
 
@@ -60,24 +61,37 @@ class FirebaseReservaService implements ReservaService {
     final uid = AuthService.usuarioAtual?.uid;
     if (uid == null) return Stream.value(const []);
 
-    return _colecao.where('usuarioId', isEqualTo: uid).snapshots().map((
-      resultado,
-    ) {
-      final agora = DateTime.now();
-      final hoje = DateTime(agora.year, agora.month, agora.day);
+    return _colecao
+        .where('usuarioId', isEqualTo: uid)
+        .snapshots()
+        .map(_deHojeEmDiante);
+  }
 
-      // Filtra e ordena aqui, e não na consulta, para não precisar criar
-      // índice composto no Firestore.
-      final lista = _converter(resultado)
-          .where((r) => !r.data.isBefore(hoje))
-          .toList();
+  /// Filtra e ordena aqui, e não na consulta, para não precisar criar índice
+  /// composto no Firestore.
+  List<Reserva> _deHojeEmDiante(QuerySnapshot<Map<String, dynamic>> r) {
+    final agora = DateTime.now();
+    final hoje = DateTime(agora.year, agora.month, agora.day);
 
-      lista.sort((a, b) {
-        final porData = a.data.compareTo(b.data);
-        return porData != 0 ? porData : a.turno.index.compareTo(b.turno.index);
-      });
-      return lista;
+    final lista = _converter(r).where((r) => !r.data.isBefore(hoje)).toList();
+    lista.sort((a, b) {
+      final porData = a.data.compareTo(b.data);
+      return porData != 0 ? porData : a.turno.index.compareTo(b.turno.index);
     });
+    return lista;
+  }
+
+  @override
+  Stream<List<Reserva>> todas() => _colecao.snapshots().map(_deHojeEmDiante);
+
+  @override
+  Stream<List<Reserva>> dasDisciplinas(List<String> disciplinaIds) {
+    if (disciplinaIds.isEmpty) return Stream.value(const []);
+    // whereIn aceita até 30 valores (veja HorarioService.dasDisciplinas).
+    return _colecao
+        .where('disciplinaId', whereIn: disciplinaIds.take(30).toList())
+        .snapshots()
+        .map(_deHojeEmDiante);
   }
 
   @override
@@ -93,6 +107,29 @@ class FirebaseReservaService implements ReservaService {
     final uid = AuthService.usuarioAtual?.uid;
     if (uid == null) {
       throw const ErroReserva('Entre na sua conta para reservar.');
+    }
+
+    // A grade de horários tem prioridade: a sala com aula fixa nesse dia da
+    // semana e turno não pode ser reservada (a reserva é a exceção, não a
+    // regra).
+    final dia = DiaSemanaInfo.de(reserva.data);
+    if (dia != null) {
+      final Horario? fixa;
+      try {
+        fixa = await HorarioService.instancia.ocupando(
+          reserva.sala,
+          dia,
+          reserva.turno,
+        );
+      } on FirebaseException catch (e) {
+        throw ErroReserva(_traduzir(e.code));
+      }
+      if (fixa != null) {
+        throw ErroReserva(
+          'Esta sala tem aula fixa de "${fixa.disciplinaNome}" nesse dia e '
+          'turno. Escolha outro dia, turno ou sala.',
+        );
+      }
     }
 
     final documento = _colecao.doc(

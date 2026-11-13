@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 
 import '../model/aviso.dart';
+import '../service/aviso_service.dart';
 import '../service/formatador_data.dart';
 import '../sidebar.dart';
+import 'aulas_do_dia.dart';
 
 // ============================================================
 // TELA PRINCIPAL
@@ -18,30 +22,50 @@ class TelaInicial extends StatefulWidget {
 class _TelaInicialState extends State<TelaInicial> {
   List<DateTime?> _dates = [DateTime.now()];
 
-  /// Avisos de exemplo enquanto não existe persistência.
-  final List<Aviso> _avisos = [
-    Aviso(
-      titulo: 'Reunião',
-      descricao: 'Reunião de conselho de classe',
-      data: DateTime.now(),
-      hora: const TimeOfDay(hour: 17, minute: 30),
-      cor: const Color(0xFFE85D75),
-    ),
-    Aviso(
-      titulo: 'Palestra',
-      descricao: 'Dar palestra sobre o uso da IA na educação',
-      data: DateTime.now(),
-      hora: const TimeOfDay(hour: 17, minute: 30),
-      cor: const Color(0xFF9B51E0),
-    ),
-    Aviso(
-      titulo: 'Relatório',
-      descricao: 'Entregar relatório das bolsas de pesquisa',
-      data: DateTime.now().add(const Duration(days: 3)),
-      hora: const TimeOfDay(hour: 17, minute: 30),
-      cor: const Color(0xFF2D9CDB),
-    ),
-  ];
+  /// Avisos da pessoa logada, vindos do Firestore e sempre atualizados.
+  List<Aviso> _avisos = const [];
+  StreamSubscription<List<Aviso>>? _assinaturaAvisos;
+
+  @override
+  void initState() {
+    super.initState();
+    _assinaturaAvisos = AvisoService.instancia.meus().listen(
+      (avisos) {
+        if (mounted) setState(() => _avisos = avisos);
+      },
+      onError: (Object _) {
+        if (mounted) _avisar('Não foi possível carregar os avisos.');
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _assinaturaAvisos?.cancel();
+    super.dispose();
+  }
+
+  void _avisar(String mensagem) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            mensagem,
+            style: const TextStyle(fontFamily: 'NunitoSans'),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _excluirAviso(Aviso aviso) async {
+    try {
+      await AvisoService.instancia.excluir(aviso);
+      if (mounted) _avisar('Aviso excluído.');
+    } on ErroAviso catch (e) {
+      if (mounted) _avisar(e.mensagem);
+    }
+  }
 
   DateTime get _dataSelecionada {
     if (_dates.isNotEmpty && _dates.first != null) {
@@ -64,11 +88,14 @@ class _TelaInicialState extends State<TelaInicial> {
       builder: (context) => DialogAviso(dataInicial: _dataSelecionada),
     );
 
-    if (novoAviso != null) {
-      setState(() {
-        _avisos.add(novoAviso);
-        _dates = [novoAviso.data];
-      });
+    if (novoAviso == null || !mounted) return;
+
+    // Vai para o dia do aviso; a lista se atualiza sozinha pelo stream.
+    setState(() => _dates = [novoAviso.data]);
+    try {
+      await AvisoService.instancia.adicionar(novoAviso);
+    } on ErroAviso catch (e) {
+      if (mounted) _avisar(e.mensagem);
     }
   }
 
@@ -293,7 +320,11 @@ class _TelaInicialState extends State<TelaInicial> {
                             separatorBuilder: (_, _) =>
                                 const SizedBox(height: 8),
                             itemBuilder: (context, index) {
-                              return CardAviso(aviso: avisosDoDia[index]);
+                              final aviso = avisosDoDia[index];
+                              return CardAviso(
+                                aviso: aviso,
+                                onExcluir: () => _excluirAviso(aviso),
+                              );
                             },
                           ),
                   ),
@@ -325,93 +356,8 @@ class _TelaInicialState extends State<TelaInicial> {
 
                   const SizedBox(height: 10),
 
-                  // ÚNICA AULA DE EXEMPLO
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F1F1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          // SALA
-                          Container(
-                            width: 75,
-                            height: double.infinity,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE3E3E3),
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(8),
-                                bottomLeft: Radius.circular(8),
-                              ),
-                            ),
-                            child: const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Sala',
-                                  style: TextStyle(
-                                    fontFamily: 'NunitoSans',
-                                    fontSize: 13,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-
-                                SizedBox(height: 2),
-
-                                Text(
-                                  '305',
-                                  style: TextStyle(
-                                    fontFamily: 'NunitoSans',
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF203F7D),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(width: 14),
-
-                          // INFORMAÇÕES DA AULA
-                          const Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Programação',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontFamily: 'NunitoSans',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF203F7D),
-                                  ),
-                                ),
-
-                                SizedBox(height: 2),
-
-                                Text(
-                                  'T30 Informática | 8h - 9h30',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontFamily: 'NunitoSans',
-                                    fontSize: 13,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(width: 10),
-                        ],
-                      ),
-                    ),
-                  ),
+                  // Reservas do dia escolhido no calendário.
+                  Expanded(child: AulasDoDia(dia: _dataSelecionada)),
                 ],
               ),
             ),
@@ -427,8 +373,9 @@ class _TelaInicialState extends State<TelaInicial> {
 // ============================================================
 class CardAviso extends StatelessWidget {
   final Aviso aviso;
+  final VoidCallback? onExcluir;
 
-  const CardAviso({super.key, required this.aviso});
+  const CardAviso({super.key, required this.aviso, this.onExcluir});
 
   @override
   Widget build(BuildContext context) {
@@ -501,6 +448,22 @@ class CardAviso extends StatelessWidget {
                 ],
               ),
             ),
+
+            if (onExcluir != null)
+              IconButton(
+                onPressed: onExcluir,
+                tooltip: 'Excluir aviso',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: Color(0xFFE23B3B),
+                ),
+              ),
           ],
         ),
       ),

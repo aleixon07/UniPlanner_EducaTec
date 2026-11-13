@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../model/semestre.dart';
+import 'disciplina_service.dart';
 
 /// Erro de semestre já traduzido para mostrar na tela.
 class ErroSemestre implements Exception {
@@ -121,13 +122,15 @@ class FirebaseSemestreService implements SemestreService {
   @override
   Future<void> excluir(Semestre semestre) async {
     try {
-      // As disciplinas do semestre vão junto; senão ficariam órfãs no banco.
+      // As disciplinas do semestre vão junto, com a grade e as matrículas
+      // delas; senão ficariam órfãs no banco.
       final disciplinas = await FirebaseFirestore.instance
           .collection('disciplinas')
           .where('semestreId', isEqualTo: semestre.id)
           .get();
       final lote = FirebaseFirestore.instance.batch();
       for (final doc in disciplinas.docs) {
+        await FirebaseDisciplinaService.excluirDependentes(lote, doc.id);
         lote.delete(doc.reference);
       }
       lote.delete(_colecao.doc(semestre.id));

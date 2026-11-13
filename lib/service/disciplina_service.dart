@@ -28,6 +28,17 @@ abstract class DisciplinaService {
   /// vazio, repetido no semestre ou se der erro.
   Future<void> adicionar(Semestre semestre, String nome);
 
+  /// Disciplinas em que o professor [professorId] dá aula, em ordem
+  /// alfabética, sempre atualizadas.
+  Stream<List<Disciplina>> doProfessor(String professorId);
+
+  /// Todas as disciplinas de todos os cursos, em ordem alfabética.
+  Stream<List<Disciplina>> todas();
+
+  /// As disciplinas com esses ids (até 30), em ordem alfabética. Usado para
+  /// as disciplinas em que um aluno está matriculado.
+  Stream<List<Disciplina>> porIds(List<String> ids);
+
   /// Uma disciplina, sempre atualizada. Emite `null` se ela não existir (mais).
   Stream<Disciplina?> observar(String id);
 
@@ -66,6 +77,37 @@ class FirebaseDisciplinaService implements DisciplinaService {
       );
       return lista;
     });
+  }
+
+  List<Disciplina> _ordenadas(QuerySnapshot<Map<String, dynamic>> resultado) {
+    final lista = resultado.docs
+        .map((doc) => Disciplina.fromMap(doc.id, doc.data()))
+        .toList();
+    lista.sort(
+      (a, b) =>
+          Disciplina.chaveNome(a.nome).compareTo(Disciplina.chaveNome(b.nome)),
+    );
+    return lista;
+  }
+
+  @override
+  Stream<List<Disciplina>> doProfessor(String professorId) {
+    return _colecao
+        .where('professorIds', arrayContains: professorId)
+        .snapshots()
+        .map(_ordenadas);
+  }
+
+  @override
+  Stream<List<Disciplina>> todas() => _colecao.snapshots().map(_ordenadas);
+
+  @override
+  Stream<List<Disciplina>> porIds(List<String> ids) {
+    if (ids.isEmpty) return Stream.value(const []);
+    return _colecao
+        .where(FieldPath.documentId, whereIn: ids.take(30).toList())
+        .snapshots()
+        .map(_ordenadas);
   }
 
   @override
@@ -168,11 +210,21 @@ class FirebaseDisciplinaService implements DisciplinaService {
         limpo,
         ignorarId: disciplina.id,
       );
-      await _colecao.doc(disciplina.id).update({
+      // A grade guarda uma cópia do nome: atualiza junto, no mesmo lote.
+      final lote = FirebaseFirestore.instance.batch();
+      lote.update(_colecao.doc(disciplina.id), {
         'nome': limpo,
         'nomeBusca': Disciplina.chaveNome(limpo),
         'atualizadoEm': FieldValue.serverTimestamp(),
       });
+      final horarios = await FirebaseFirestore.instance
+          .collection('horarios')
+          .where('disciplinaId', isEqualTo: disciplina.id)
+          .get();
+      for (final h in horarios.docs) {
+        lote.update(h.reference, {'disciplinaNome': limpo});
+      }
+      await lote.commit();
     } on FirebaseException catch (e) {
       throw ErroDisciplina(_traduzir(e.code));
     }
@@ -181,9 +233,31 @@ class FirebaseDisciplinaService implements DisciplinaService {
   @override
   Future<void> excluir(Disciplina disciplina) async {
     try {
-      await _colecao.doc(disciplina.id).delete();
+      final lote = FirebaseFirestore.instance.batch();
+      await excluirDependentes(lote, disciplina.id);
+      lote.delete(_colecao.doc(disciplina.id));
+      await lote.commit();
     } on FirebaseException catch (e) {
       throw ErroDisciplina(_traduzir(e.code));
+    }
+  }
+
+  /// Põe no [lote] a exclusão do que depende da disciplina: as aulas dela na
+  /// grade e as matrículas. As reservas ficam (são histórico, e guardam o nome
+  /// da disciplina copiado).
+  static Future<void> excluirDependentes(
+    WriteBatch lote,
+    String disciplinaId,
+  ) async {
+    final db = FirebaseFirestore.instance;
+    for (final colecao in ['horarios', 'matriculas']) {
+      final docs = await db
+          .collection(colecao)
+          .where('disciplinaId', isEqualTo: disciplinaId)
+          .get();
+      for (final doc in docs.docs) {
+        lote.delete(doc.reference);
+      }
     }
   }
 

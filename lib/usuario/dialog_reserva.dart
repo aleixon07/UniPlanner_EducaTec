@@ -6,7 +6,13 @@ import 'package:flutter/material.dart';
 import '../model/reserva.dart';
 import '../model/sala.dart';
 import '../service/formatador_data.dart';
+import '../model/disciplina.dart';
+import '../model/horario.dart';
+import '../model/usuario.dart';
+import '../service/horario_service.dart';
 import '../service/reserva_service.dart';
+import '../service/agenda.dart';
+import '../service/sessao.dart';
 
 const Color _azul = Color(0xFF3750B5);
 const Color _azulEscuro = Color(0xFF203F7D);
@@ -26,7 +32,12 @@ class DialogReserva extends StatefulWidget {
 }
 
 class _DialogReservaState extends State<DialogReserva> {
-  String? _disciplina;
+  // Criado uma vez só, para o build não abrir conexões novas.
+  late final Stream<List<Disciplina>> _disciplinas = disciplinasParaReserva(
+    Sessao.usuario,
+  );
+
+  Disciplina? _disciplina;
   Turno _turno = Turno.manha;
   DateTime? _diaSelecionado;
   String? _erro;
@@ -36,9 +47,34 @@ class _DialogReservaState extends State<DialogReserva> {
   List<Reserva> _reservasDaSala = const [];
   StreamSubscription<List<Reserva>>? _assinatura;
 
+  // Aulas fixas da grade nesta sala: o dia da semana + turno delas fica
+  // ocupado em todas as semanas.
+  List<Horario> _aulasFixas = const [];
+  StreamSubscription<List<Horario>>? _assinaturaFixas;
+
   @override
   void initState() {
     super.initState();
+    _assinaturaFixas = HorarioService.instancia
+        .daSala(widget.sala)
+        .listen(
+          (aulas) {
+            if (!mounted) return;
+            setState(() {
+              _aulasFixas = aulas;
+              final escolhido = _diaSelecionado;
+              if (escolhido != null && _estaOcupado(escolhido)) {
+                _diaSelecionado = null;
+              }
+            });
+          },
+          onError: (Object _) {
+            if (!mounted) return;
+            setState(
+              () => _erro = 'Não foi possível carregar a grade da sala.',
+            );
+          },
+        );
     _assinatura = ReservaService.instancia
         .reservasDaSala(widget.sala)
         .listen(
@@ -65,11 +101,17 @@ class _DialogReservaState extends State<DialogReserva> {
   @override
   void dispose() {
     _assinatura?.cancel();
+    _assinaturaFixas?.cancel();
     super.dispose();
   }
 
   bool _estaOcupado(DateTime dia) {
-    return _reservasDaSala.any((r) => r.turno == _turno && r.ehDoDia(dia));
+    final diaSemana = DiaSemanaInfo.de(dia);
+    final temAulaFixa = _aulasFixas.any(
+      (h) => h.dia == diaSemana && h.turno == _turno,
+    );
+    return temAulaFixa ||
+        _reservasDaSala.any((r) => r.turno == _turno && r.ehDoDia(dia));
   }
 
   void _adicionar() {
@@ -87,7 +129,8 @@ class _DialogReservaState extends State<DialogReserva> {
       context,
       Reserva(
         sala: widget.sala,
-        disciplina: _disciplina!,
+        disciplina: _disciplina!.nome,
+        disciplinaId: _disciplina!.id,
         turno: _turno,
         data: DateTime(
           _diaSelecionado!.year,
@@ -145,49 +188,91 @@ class _DialogReservaState extends State<DialogReserva> {
 
             const SizedBox(height: 6),
 
-            DropdownButtonFormField<String>(
-              initialValue: _disciplina,
-              isExpanded: true,
-              hint: const Text(
-                'Disciplina',
-                style: TextStyle(
-                  fontFamily: 'NunitoSans',
-                  color: Color(0xFF9E9E9E),
-                ),
-              ),
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
-                ),
-              ),
-              items: [
-                for (final disciplina in ReservaService.disciplinas)
-                  DropdownMenuItem(
-                    value: disciplina,
-                    child: Text(
-                      disciplina,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: 'NunitoSans',
-                        fontSize: 14,
-                      ),
+            StreamBuilder<List<Disciplina>>(
+              stream: _disciplinas,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const _AvisoDisciplinas(
+                    'Não foi possível carregar as disciplinas.',
+                    cor: _vermelho,
+                  );
+                }
+
+                final disciplinas = snapshot.data;
+                if (disciplinas == null) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (disciplinas.isEmpty) {
+                  return _AvisoDisciplinas(switch (Sessao.usuario?.perfil) {
+                    PerfilUsuario.professor =>
+                      'Você ainda não está em nenhuma disciplina. Peça ao '
+                          'administrador para incluir você.',
+                    PerfilUsuario.aluno =>
+                      'Você ainda não está matriculado em nenhuma disciplina. '
+                          'Faça a matrícula pelo menu.',
+                    _ => 'Nenhuma disciplina cadastrada.',
+                  });
+                }
+
+                // A escolha só vale se ainda for uma das opções (a disciplina
+                // pode ter sido excluída com o modal aberto).
+                final escolhida =
+                    disciplinas.any((d) => d.id == _disciplina?.id)
+                    ? _disciplina!.id
+                    : null;
+
+                return DropdownButtonFormField<String>(
+                  initialValue: escolhida,
+                  isExpanded: true,
+                  hint: const Text(
+                    'Disciplina',
+                    style: TextStyle(
+                      fontFamily: 'NunitoSans',
+                      color: Color(0xFF9E9E9E),
                     ),
                   ),
-              ],
-              onChanged: (valor) {
-                setState(() {
-                  _disciplina = valor;
-                  _erro = null;
-                });
+                  dropdownColor: Colors.white,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFCCCCCC)),
+                    ),
+                  ),
+                  items: [
+                    for (final disciplina in disciplinas)
+                      DropdownMenuItem(
+                        value: disciplina.id,
+                        child: Text(
+                          disciplina.nome,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'NunitoSans',
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                  ],
+                  onChanged: (id) {
+                    setState(() {
+                      _disciplina = disciplinas
+                          .where((d) => d.id == id)
+                          .firstOrNull;
+                      _erro = null;
+                    });
+                  },
+                );
               },
             ),
 
@@ -631,6 +716,24 @@ class _LinhaResumo extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AvisoDisciplinas extends StatelessWidget {
+  final String texto;
+  final Color cor;
+
+  const _AvisoDisciplinas(this.texto, {this.cor = const Color(0xFF7A7A7A)});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Text(
+        texto,
+        style: TextStyle(fontFamily: 'NunitoSans', fontSize: 13, color: cor),
       ),
     );
   }

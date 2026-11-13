@@ -238,7 +238,7 @@ Future<bool> confirmarExclusaoSemestre(
         ),
       ),
       content: Text(
-        'O ${semestre.rotulo} e todas as disciplinas dele serão excluídos do '
+        'O ${semestre.rotulo}, as disciplinas, a grade e as matrículas dele serão excluídos do '
         'curso "${curso.nome}". Esta ação não pode ser desfeita.',
         style: const TextStyle(fontFamily: 'NunitoSans', fontSize: 14),
       ),

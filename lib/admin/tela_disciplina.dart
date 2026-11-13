@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../model/disciplina.dart';
+import '../model/matricula.dart';
 import '../model/usuario.dart';
 import '../service/disciplina_service.dart';
+import '../service/matricula_service.dart';
 import '../service/usuario_service.dart';
 import '../sidebar.dart';
 
@@ -209,6 +211,22 @@ class _TelaDisciplinaState extends State<TelaDisciplina> {
                 return _professoresDaDisciplina(disciplina, todos);
               },
             ),
+
+            const SizedBox(height: 28),
+
+            const Text(
+              'Alunos',
+              style: TextStyle(
+                fontFamily: 'NunitoSans',
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: _azulEscuro,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            _SecaoAlunos(disciplina: disciplina),
           ],
         ),
       ),
@@ -423,6 +441,192 @@ class _Aviso extends StatelessWidget {
           style: TextStyle(fontFamily: 'NunitoSans', fontSize: 16, color: cor),
         ),
       ),
+    );
+  }
+}
+
+// ================================================================
+// ALUNOS MATRICULADOS (o administrador matricula a qualquer momento)
+// ================================================================
+class _SecaoAlunos extends StatefulWidget {
+  final Disciplina disciplina;
+
+  const _SecaoAlunos({required this.disciplina});
+
+  @override
+  State<_SecaoAlunos> createState() => _SecaoAlunosState();
+}
+
+class _SecaoAlunosState extends State<_SecaoAlunos> {
+  late final Stream<List<Matricula>> _matriculas = MatriculaService.instancia
+      .daDisciplina(widget.disciplina.id);
+  late final Stream<List<Usuario>> _alunos = UsuarioService.instancia.listar(
+    PerfilUsuario.aluno,
+  );
+
+  String? _escolhido;
+  bool _salvando = false;
+  int _versaoSelect = 0;
+
+  void _avisar(String mensagem) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            mensagem,
+            style: const TextStyle(fontFamily: 'NunitoSans'),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _matricular() async {
+    final id = _escolhido;
+    if (id == null || _salvando) return;
+    setState(() => _salvando = true);
+    try {
+      await MatriculaService.instancia.matricular(id, widget.disciplina);
+      if (!mounted) return;
+      setState(() {
+        _escolhido = null;
+        _versaoSelect++;
+      });
+      _avisar('Aluno matriculado.');
+    } on ErroMatricula catch (e) {
+      if (mounted) _avisar(e.mensagem);
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  Future<void> _remover(String alunoId) async {
+    try {
+      await MatriculaService.instancia.cancelar(alunoId, widget.disciplina.id);
+    } on ErroMatricula catch (e) {
+      if (mounted) _avisar(e.mensagem);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Usuario>>(
+      stream: _alunos,
+      builder: (context, snapAlunos) {
+        return StreamBuilder<List<Matricula>>(
+          stream: _matriculas,
+          builder: (context, snapMatriculas) {
+            if (snapAlunos.hasError || snapMatriculas.hasError) {
+              return const _Mensagem(
+                'Não foi possível carregar os alunos.',
+                cor: _vermelho,
+              );
+            }
+            final alunos = snapAlunos.data;
+            final matriculas = snapMatriculas.data;
+            if (alunos == null || matriculas == null) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final matriculados = {for (final m in matriculas) m.alunoId};
+            final nomes = {for (final a in alunos) a.id: a.nome};
+            final disponiveis = alunos
+                .where((a) => a.ativo && !matriculados.contains(a.id))
+                .toList();
+            // Mesmo cuidado do select de professores: o valor só vale se
+            // ainda for uma das opções.
+            final escolhido = disponiveis.any((a) => a.id == _escolhido)
+                ? _escolhido
+                : null;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (matriculados.isEmpty)
+                  const _Mensagem('Nenhum aluno matriculado.')
+                else
+                  for (final id in matriculados)
+                    _ItemProfessor(
+                      nome: nomes[id] ?? 'Aluno não encontrado',
+                      onRemover: () => _remover(id),
+                    ),
+                const SizedBox(height: 12),
+                if (disponiveis.isEmpty)
+                  _Mensagem(
+                    alunos.isEmpty
+                        ? 'Nenhum aluno cadastrado ainda.'
+                        : 'Todos os alunos já estão nesta disciplina.',
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey(_versaoSelect),
+                          isExpanded: true,
+                          initialValue: escolhido,
+                          hint: const Text(
+                            'Selecione um aluno',
+                            style: TextStyle(
+                              fontFamily: 'NunitoSans',
+                              color: Color(0xFF9E9E9E),
+                            ),
+                          ),
+                          dropdownColor: Colors.white,
+                          items: [
+                            for (final a in disponiveis)
+                              DropdownMenuItem(
+                                value: a.id,
+                                child: Text(
+                                  a.nome,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'NunitoSans',
+                                  ),
+                                ),
+                              ),
+                          ],
+                          onChanged: _salvando
+                              ? null
+                              : (v) => setState(() => _escolhido = v),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        onPressed: escolhido == null || _salvando
+                            ? null
+                            : _matricular,
+                        tooltip: 'Matricular aluno',
+                        icon: _salvando
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

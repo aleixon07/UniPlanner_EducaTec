@@ -13,7 +13,7 @@ class ErroCadastro implements Exception {
   String toString() => mensagem;
 }
 
-/// Acesso aos usuários (alunos e professores).
+/// Acesso aos usuários (alunos, professores e administradores).
 ///
 /// É uma classe abstrata para as telas poderem ser testadas sem Firebase:
 /// os testes trocam [instancia] por uma versão falsa.
@@ -23,18 +23,24 @@ abstract class UsuarioService {
   /// Usuários do [perfil], em ordem alfabética, sempre atualizados.
   Stream<List<Usuario>> listar(PerfilUsuario perfil);
 
-  /// Cria a conta de login e o cadastro do usuário. Lança [ErroCadastro].
+  /// Todos os usuários, de qualquer perfil, sempre atualizados.
+  Stream<List<Usuario>> todos();
+
+  /// Cria a conta de login e o cadastro do usuário. [cursoId] vale só para
+  /// alunos (professor ignora). Lança [ErroCadastro].
   Future<void> cadastrar({
     required String nome,
     required String email,
     required String senha,
     required PerfilUsuario perfil,
+    String? cursoId,
   });
 
-  /// Muda o nome do usuário. O e-mail e a senha não mudam aqui: trocar a conta
-  /// de login de outra pessoa exige o Firebase Admin (Cloud Functions), que o
-  /// app não tem. Lança [ErroCadastro].
-  Future<void> editar(String id, String nome);
+  /// Muda o nome do usuário e, se for aluno, o curso ([cursoId] `null` tira o
+  /// aluno do curso). O e-mail e a senha não mudam aqui: trocar a conta de
+  /// login de outra pessoa exige o Firebase Admin (Cloud Functions), que o app
+  /// não tem. Lança [ErroCadastro].
+  Future<void> editar(Usuario usuario, String nome, {String? cursoId});
 
   /// Desativa ou reativa o usuário. Um usuário desativado não consegue entrar
   /// (veja [AuthService.entrar]). Lança [ErroCadastro].
@@ -63,11 +69,17 @@ class FirebaseUsuarioService implements UsuarioService {
   }
 
   @override
+  Stream<List<Usuario>> todos() => _colecao.snapshots().map(
+    (r) => [for (final doc in r.docs) Usuario.fromMap(doc.id, doc.data())],
+  );
+
+  @override
   Future<void> cadastrar({
     required String nome,
     required String email,
     required String senha,
     required PerfilUsuario perfil,
+    String? cursoId,
   }) async {
     final emailLimpo = email.trim().toLowerCase();
 
@@ -102,6 +114,8 @@ class FirebaseUsuarioService implements UsuarioService {
             nome: nome.trim(),
             email: emailLimpo,
             perfil: perfil,
+            cursoId: perfil == PerfilUsuario.aluno ? cursoId : null,
+            senhaTemporaria: true,
           ).toMap(),
           'criadoEm': FieldValue.serverTimestamp(),
         });
@@ -123,12 +137,15 @@ class FirebaseUsuarioService implements UsuarioService {
   }
 
   @override
-  Future<void> editar(String id, String nome) async {
+  Future<void> editar(Usuario usuario, String nome, {String? cursoId}) async {
     final limpo = nome.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (limpo.isEmpty) throw const ErroCadastro('Informe o nome.');
 
-    await _atualizar(id, {
+    await _atualizar(usuario.id, {
       'nome': limpo,
+      // Só aluno tem curso; sem curso, o campo é apagado do documento.
+      if (usuario.perfil == PerfilUsuario.aluno)
+        'cursoId': cursoId ?? FieldValue.delete(),
       'atualizadoEm': FieldValue.serverTimestamp(),
     });
   }
