@@ -47,3 +47,5 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 .claude/
+
+/lib/lib/firebase_options.dart
