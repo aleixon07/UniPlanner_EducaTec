@@ -91,133 +91,144 @@ class _LoginState extends State<Login> {
     return Scaffold(
       appBar: const AppBarUniPlanner(),
 
-      body: Column(
-        children: [
-          Center(
-            child: Container(
-              color: Colors.white,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 50),
-                    const Text(
-                      'Seja Bem-Vindo',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'NunitoSans',
-                      ),
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    Image.asset('assets/logo.png', width: 120),
-
-                    const SizedBox(height: 25),
-
-                    SizedBox(
-                      width: 300,
-                      child: TextField(
-                        controller: _emailController,
-                        enabled: !_carregando,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'E-mail',
-                          hintText: 'Digite seu e-mail',
-                          labelStyle: const TextStyle(fontFamily: 'NunitoSans'),
-                          hintStyle: const TextStyle(fontFamily: 'NunitoSans'),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(5),
-                          ),
+      // Rola quando o teclado abre, para o botão Entrar nunca ficar escondido.
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Center(
+              child: Container(
+                color: Colors.white,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 50),
+                      const Text(
+                        'Seja Bem-Vindo',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'NunitoSans',
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 15),
+                      const SizedBox(height: 25),
 
-                    SizedBox(
-                      width: 300,
-                      child: TextField(
-                        controller: _senhaController,
-                        enabled: !_carregando,
-                        obscureText: true,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _entrar(),
-                        decoration: InputDecoration(
-                          labelText: 'Senha',
-                          hintText: 'Digite sua senha',
-                          labelStyle: const TextStyle(fontFamily: 'NunitoSans'),
-                          hintStyle: const TextStyle(fontFamily: 'NunitoSans'),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                        ),
-                      ),
-                    ),
+                      Image.asset('assets/logo.png', width: 120),
 
-                    if (_erro != null) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 25),
+
                       SizedBox(
                         width: 300,
-                        child: Text(
-                          _erro!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontFamily: 'NunitoSans',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFE23B3B),
+                        child: TextField(
+                          controller: _emailController,
+                          enabled: !_carregando,
+                          keyboardType: TextInputType.emailAddress,
+                          autocorrect: false,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            labelText: 'E-mail',
+                            hintText: 'Digite seu e-mail',
+                            labelStyle: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                            ),
+                            hintStyle: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(5),
+                            ),
                           ),
                         ),
                       ),
-                    ],
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 15),
 
-                    LinkText(
-                      titulo: 'Esqueceu sua senha? Clique aqui!',
-                      telaDestino: RecuperarSenha(),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3750B5),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 50,
-                          vertical: 15,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                      SizedBox(
+                        width: 300,
+                        child: TextField(
+                          controller: _senhaController,
+                          enabled: !_carregando,
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _entrar(),
+                          decoration: InputDecoration(
+                            labelText: 'Senha',
+                            hintText: 'Digite sua senha',
+                            labelStyle: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                            ),
+                            hintStyle: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
                         ),
                       ),
-                      onPressed: _carregando ? null : _entrar,
-                      child: _carregando
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Entrar',
-                              style: TextStyle(fontFamily: 'NunitoSans'),
+
+                      if (_erro != null) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: 300,
+                          child: Text(
+                            _erro!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'NunitoSans',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFE23B3B),
                             ),
-                    ),
-                  ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 20),
+
+                      LinkText(
+                        titulo: 'Esqueceu sua senha? Clique aqui!',
+                        telaDestino: RecuperarSenha(),
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3750B5),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 50,
+                            vertical: 15,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        onPressed: _carregando ? null : _entrar,
+                        child: _carregando
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Entrar',
+                                style: TextStyle(fontFamily: 'NunitoSans'),
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(flex: 1, child: Container(color: Colors.white)),
-        ],
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
