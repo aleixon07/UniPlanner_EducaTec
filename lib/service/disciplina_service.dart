@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'conflitos.dart';
 import '../model/disciplina.dart';
 import '../model/semestre.dart';
 
@@ -126,6 +127,25 @@ class FirebaseDisciplinaService implements DisciplinaService {
     String professorId,
   ) async {
     try {
+      // O professor precisa estar livre em todos os blocos da disciplina. Se
+      // a disciplina ainda não tem grade, a checagem acontece quando a grade for
+      // montada (HorarioService.salvar).
+      for (final aula in await Conflitos.horariosDaDisciplina(disciplina.id)) {
+        final outra = await Conflitos.doProfessor(
+          professorId,
+          aula.dia,
+          aula.turno,
+          ignorarDisciplinaId: disciplina.id,
+        );
+        if (outra != null) {
+          throw ErroDisciplina(
+            'Este professor já dá "${outra.disciplinaNome}" na '
+            '${Conflitos.descrever(outra.dia, outra.turno)}, que é o mesmo '
+            'horário de "${disciplina.nome}".',
+          );
+        }
+      }
+
       await _colecao.doc(disciplina.id).update({
         'professorIds': FieldValue.arrayUnion([professorId]),
         'atualizadoEm': FieldValue.serverTimestamp(),

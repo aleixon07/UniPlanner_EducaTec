@@ -188,6 +188,39 @@ class AuthService {
     }
   }
 
+  /// Ao abrir o app: se já existe uma conta logada neste aparelho, carrega o
+  /// cadastro dela sem pedir a senha de novo. Devolve `null` quando a pessoa
+  /// precisa passar pela tela de login.
+  ///
+  /// - Sem conta salva: `null`.
+  /// - Sem conexão: `null`, mas a sessão do Firebase é mantida (não é
+  ///   culpa da pessoa estar sem internet no momento de abrir o app).
+  /// - Desativada ou ainda com senha temporária: sai da conta e devolve `null`.
+  static Future<Usuario?> restaurarSessao() async {
+    final conta = _auth.currentUser;
+    if (conta == null) return null;
+
+    final DocumentSnapshot<Map<String, dynamic>> doc;
+    try {
+      doc = await _usuarios.doc(conta.uid).get();
+    } on FirebaseException {
+      return null;
+    }
+
+    final dados = doc.data();
+    // Sem cadastro: o login é quem decide (por exemplo, o primeiro administrador).
+    if (dados == null) return null;
+
+    final usuario = Usuario.fromMap(doc.id, dados);
+    if (!usuario.ativo || usuario.senhaTemporaria) {
+      await sair();
+      return null;
+    }
+
+    Sessao.atual.value = usuario;
+    return usuario;
+  }
+
   static Future<void> sair() async {
     // Quem entrar depois neste aparelho não deve receber as aulas de quem saiu.
     await Lembretes.parar();

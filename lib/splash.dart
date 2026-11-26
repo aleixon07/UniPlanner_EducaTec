@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'login.dart';
+import 'service/auth_service.dart';
+import 'service/lembretes.dart';
+import 'usuario/principal.dart';
 
 /// Tela de abertura do app.
 ///
@@ -54,17 +59,28 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
       ),
     );
 
-    _controller.forward().whenComplete(_irParaLogin);
+    _controller.forward().whenComplete(_proximaTela);
   }
 
-  void _irParaLogin() {
+  /// Depois da animação: quem já está logado neste aparelho vai direto para a
+  /// tela principal, de qualquer perfil. Os demais vão para o login.
+  Future<void> _proximaTela() async {
     if (!mounted) return;
+
+    final usuario = await AuthService.restaurarSessao();
+    if (!mounted) return;
+
+    if (usuario != null) {
+      // Os lembretes de aula também precisam voltar a ser agendados.
+      unawaited(Lembretes.iniciarPara(usuario));
+    }
 
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (context, animation, secondaryAnimation) => const Login(),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            usuario != null ? const TelaInicial() : const Login(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

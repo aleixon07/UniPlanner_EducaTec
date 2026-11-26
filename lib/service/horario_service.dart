@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'conflitos.dart';
 import '../model/horario.dart';
 import '../model/reserva.dart';
 import '../model/sala.dart';
@@ -93,6 +94,29 @@ class FirebaseHorarioService implements HorarioService {
           '"${conflito.disciplinaNome}" na ${horario.dia.rotulo.toLowerCase()} '
           '(${horario.turno.rotulo.toLowerCase()}).',
         );
+      }
+
+      // Cada professor da disciplina precisa estar livre neste bloco.
+      final disciplina = await FirebaseFirestore.instance
+          .collection('disciplinas')
+          .doc(horario.disciplinaId)
+          .get();
+      final professores = [
+        ...?(disciplina.data()?['professorIds'] as List?)?.whereType<String>(),
+      ];
+      for (final professorId in professores) {
+        final outra = await Conflitos.doProfessor(
+          professorId,
+          horario.dia,
+          horario.turno,
+          ignorarDisciplinaId: horario.disciplinaId,
+        );
+        if (outra != null) {
+          throw ErroHorario(
+            'Um dos professores desta disciplina já dá "${outra.disciplinaNome}" '
+            'na ${Conflitos.descrever(horario.dia, horario.turno)}.',
+          );
+        }
       }
 
       await _colecao.doc(id).set({

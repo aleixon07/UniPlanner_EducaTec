@@ -2,6 +2,7 @@
     <!-- Lembretes de aula (flutter_local_notifications): mostrar notificação
          e reagendar os lembretes quando o celular reinicia. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="uniplanner"

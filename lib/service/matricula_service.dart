@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'conflitos.dart';
 import '../model/disciplina.dart';
 import '../model/matricula.dart';
 
@@ -84,6 +85,23 @@ class FirebaseMatriculaService implements MatriculaService {
   @override
   Future<void> matricular(String alunoId, Disciplina disciplina) async {
     try {
+      // O aluno não pode ter aulas no mesmo bloco de outra disciplina sua.
+      for (final aula in await Conflitos.horariosDaDisciplina(disciplina.id)) {
+        final outra = await Conflitos.doAluno(
+          alunoId,
+          aula.dia,
+          aula.turno,
+          ignorarDisciplinaId: disciplina.id,
+        );
+        if (outra != null) {
+          throw ErroMatricula(
+            'Você já está matriculado em "${outra.disciplinaNome}", que tem aula '
+            'na ${Conflitos.descrever(outra.dia, outra.turno)}, o mesmo horário '
+            'de "${disciplina.nome}".',
+          );
+        }
+      }
+
       await _colecao.doc(Matricula.idPara(alunoId, disciplina.id)).set({
         ...Matricula(
           alunoId: alunoId,

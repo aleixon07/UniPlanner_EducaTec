@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'admin/dados_teste.dart';
 import 'admin/gerenciar_cursos.dart';
 import 'admin/gerenciar_matriculas.dart';
 import 'admin/gerenciar_reservas.dart';
@@ -123,6 +124,13 @@ class _SidebarState extends State<Sidebar> {
                     _itemMenu(
                       titulo: 'Período de Matrícula',
                       onTap: () => _abrir(const GerenciarMatriculas()),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    _itemMenu(
+                      titulo: 'Dados de Teste',
+                      onTap: () => _abrir(const TelaDadosTeste()),
                     ),
 
                     const SizedBox(height: 4),

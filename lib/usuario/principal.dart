@@ -5,6 +5,7 @@ import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 
 import '../model/aviso.dart';
 import '../service/aviso_service.dart';
+import '../service/lembretes.dart';
 import '../service/formatador_data.dart';
 import '../sidebar.dart';
 import 'aulas_do_dia.dart';
@@ -32,6 +33,7 @@ class _TelaInicialState extends State<TelaInicial> {
     _assinaturaAvisos = AvisoService.instancia.meus().listen(
       (avisos) {
         if (mounted) setState(() => _avisos = avisos);
+        unawaited(Lembretes.sincronizarAvisos(avisos));
       },
       onError: (Object _) {
         if (mounted) _avisar('Não foi possível carregar os avisos.');
